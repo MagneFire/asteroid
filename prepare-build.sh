@@ -1,3 +1,4 @@
+
 #!/bin/bash
 # Copyright (C) 2015 Florent Revest <revestflo@gmail.com>
 #
@@ -76,7 +77,6 @@ else
     clone_dir src/meta-openembedded    https://github.com/openembedded/meta-openembedded.git warrior
     clone_dir src/meta-qt5             https://github.com/meta-qt5/meta-qt5                  master 8bc72a78b13f2f4c5e1cebebaef9e98b9abbb056
     clone_dir src/meta-smartphone      https://github.com/shr-distribution/meta-smartphone   warrior
-    clone_dir src/meta-asteroid        https://github.com/AsteroidOS/meta-asteroid           master
     clone_dir src/meta-anthias-hybris  https://github.com/AsteroidOS/meta-anthias-hybris     master
     clone_dir src/meta-bass-hybris     https://github.com/AsteroidOS/meta-bass-hybris        master
     clone_dir src/meta-dory-hybris     https://github.com/AsteroidOS/meta-dory-hybris        master
@@ -85,10 +85,12 @@ else
     clone_dir src/meta-mooneye-hybris  https://github.com/AsteroidOS/meta-mooneye-hybris     master
     clone_dir src/meta-sparrow-hybris  https://github.com/AsteroidOS/meta-sparrow-hybris     master
     clone_dir src/meta-sprat-hybris    https://github.com/AsteroidOS/meta-sprat-hybris       master
-    clone_dir src/meta-sturgeon-hybris https://github.com/AsteroidOS/meta-sturgeon-hybris    master
     clone_dir src/meta-swift-hybris    https://github.com/AsteroidOS/meta-swift-hybris       master
     clone_dir src/meta-tetra-hybris    https://github.com/AsteroidOS/meta-tetra-hybris       master
     clone_dir src/meta-wren-hybris     https://github.com/AsteroidOS/meta-wren-hybris        master
+    clone_dir src/meta-asteroid        https://github.com/MagneFire/meta-asteroid            master
+    clone_dir src/meta-sturgeon-hybris https://github.com/MagneFire/meta-sturgeon-hybris     master
+    clone_dir src/meta-games           https://github.com/MagneFire/meta-games               master
 
     # Create local.conf and bblayers.conf on first run
     if [ ! -e build/conf/local.conf ]; then
@@ -125,6 +127,7 @@ BBLAYERS = " \
   ${SRCDIR}/meta-mooneye-hybris \
   ${SRCDIR}/meta-swift-hybris \
   ${SRCDIR}/meta-wren-hybris \
+  ${SRCDIR}/meta-games \
   "' > build/conf/bblayers.conf
     fi
 
