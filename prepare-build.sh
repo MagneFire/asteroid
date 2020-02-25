@@ -41,6 +41,7 @@ function clone_dir {
             git checkout $4
             popd
         fi
+        patch -d $1 -p1 < patches/$1.patch
     fi
 }
 
