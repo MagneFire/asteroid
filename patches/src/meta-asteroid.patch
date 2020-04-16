@@ -1,13 +1,187 @@
+diff --git a/recipes-asteroid/asteroid-audiod/asteroid-audiod/asteroid-audiod.service b/recipes-asteroid/asteroid-audiod/asteroid-audiod/asteroid-audiod.service
+new file mode 100644
+index 0000000..2cce318
+--- /dev/null
++++ b/recipes-asteroid/asteroid-audiod/asteroid-audiod/asteroid-audiod.service
+@@ -0,0 +1,13 @@
++[Unit]
++Description=Starts the audio player/recorder daemon
++Requires=dbus.socket
++After=bluetooth.service
++ConditionUser=!root
++ 
++[Service]
++Type=simple
++ExecStart=/usr/bin/asteroid-audiod
++Restart=always
++ 
++[Install]
++WantedBy=default.target
+diff --git a/recipes-asteroid/asteroid-audiod/asteroid-audiod_git.bb b/recipes-asteroid/asteroid-audiod/asteroid-audiod_git.bb
+new file mode 100644
+index 0000000..ba8b79c
+--- /dev/null
++++ b/recipes-asteroid/asteroid-audiod/asteroid-audiod_git.bb
+@@ -0,0 +1,31 @@
++SUMMARY = "Asteroid's audio player/recorder daemon."
++HOMEPAGE = "https://github.com/AsteroidOS/asteroid-audiod"
++LICENSE = "GPLv3"
++LIC_FILES_CHKSUM = "file://LICENSE;md5=84dcc94da3adb52b53ae4fa38fe49e5d"
++
++SRC_URI = "git://github.com/MagneFire/asteroid-audiod.git;protocol=https \
++    file://asteroid-audiod.service"
++SRCREV = "${AUTOREV}"
++PR = "r1"
++PV = "+git${SRCPV}"
++S = "${WORKDIR}/git"
++inherit qmake5 gsettings
++
++DEPENDS += "qtbase glibmm qtmpris statefs-qt timed qttools-native"
++RDEPENDS_${PN} += "glibmm qtmpris"
++
++FILES_${PN} += "/usr/bin/ /usr/lib/systemd/user/ /usr/share/glib-2.0/schemas /usr/share/translations/ /usr/lib/systemd/user/default.target.wants/"
++
++do_install_append() {
++    install -d ${D}/usr/lib/systemd/user/
++    install -d ${D}/usr/lib/systemd/user/default.target.wants/
++    cp ../asteroid-audiod.service ${D}/usr/lib/systemd/user/
++    if [ ! -f ${D}/usr/lib/systemd/user/default.target.wants/asteroid-audiod.service ]; then
++        ln -s /usr/lib/systemd/user/asteroid-audiod.service ${D}/usr/lib/systemd/user/default.target.wants/asteroid-audiod.service
++    fi
++
++    lrelease -idbased ${S}/i18n/asteroid-audiod.*.ts
++    install -d ${D}/usr/share/translations/
++    cp ${S}/i18n/asteroid-audiod.*.qm ${D}/usr/share/translations/
++}
++
+diff --git a/recipes-asteroid/asteroid-launcher/asteroid-launcher/0001-Save-the-AppLauncher-item-position.patch b/recipes-asteroid/asteroid-launcher/asteroid-launcher/0001-Save-the-AppLauncher-item-position.patch
+new file mode 100644
+index 0000000..a222924
+--- /dev/null
++++ b/recipes-asteroid/asteroid-launcher/asteroid-launcher/0001-Save-the-AppLauncher-item-position.patch
+@@ -0,0 +1,84 @@
++From a12232dbb4a9b5fde86e80da22988b67a793845e Mon Sep 17 00:00:00 2001
++From: MagneFire <IDaNLContact@gmail.com>
++Date: Sun, 2 Feb 2020 20:33:24 +0100
++Subject: [PATCH] Save the AppLauncher item position. This is useful when an
++ app kills the launcher to start something as the hwcomposer.
++
++---
++ qml/applauncher/AppLauncher.qml | 30 +++++++++++++++++++++++++-----
++ 1 file changed, 25 insertions(+), 5 deletions(-)
++
++diff --git a/qml/applauncher/AppLauncher.qml b/qml/applauncher/AppLauncher.qml
++index 0e506b4..12eef06 100644
++--- a/qml/applauncher/AppLauncher.qml
+++++ b/qml/applauncher/AppLauncher.qml
++@@ -33,6 +33,7 @@
++ import QtQuick 2.9
++ import org.asteroid.controls 1.0
++ import org.nemomobile.lipstick 0.1
+++import Nemo.Configuration 1.0
++ 
++ ListView {
++     id: appsListView
++@@ -45,11 +46,21 @@ ListView {
++     property bool toLeftAllowed:   true
++     property bool toRightAllowed:  false
++     property int currentPos: 0
+++    property int savedPos: 0
+++
+++    ConfigurationValue {
+++        id: itemIndex
+++        key: "/launcher/item-index"
+++        defaultValue: 0
+++    }
++ 
++     onCurrentPosChanged: {
++         toLeftAllowed = (currentPos!=launcherModel.itemCount-1)
++         toRightAllowed  = (currentPos!=0)
++ 
+++        // Save item index in case the launcher gets killed.
+++        itemIndex.value = currentPos
+++
++         rightIndicator.animate()
++         leftIndicator.animate()
++         topIndicator.animate()
++@@ -60,7 +71,9 @@ ListView {
++ 
++     delegate: LauncherItemDelegate {
++         id: launcherItem
++-        width: appsListView.width
+++        // In onCompleted the width of appsListView is zero, we need it to be non-zero
+++        // in order to make positionViewAtIndex work
+++        width: appsListView.width == 0 ? 1 : appsListView.width
++         height: appsListView.width
++         iconName: model.object.iconId == "" ? "ios-help" : model.object.iconId
++         iconCaption: model.object.title.toUpperCase() + localeManager.changesObserver
++@@ -68,14 +81,21 @@ ListView {
++     }
++ 
++     Component.onCompleted: {
++-        launcherCenterColor = alb.centerColor(launcherModel.get(0).filePath);
++-        launcherOuterColor = alb.outerColor(launcherModel.get(0).filePath);
+++        currentPos = itemIndex.value
+++        savedPos = currentPos
+++        launcherCenterColor = alb.centerColor(launcherModel.get(savedPos).filePath);
+++        launcherOuterColor = alb.outerColor(launcherModel.get(savedPos).filePath);
+++        // When moving the view to a different index we get that savedPos becomes 0,0.
+++        // This means that when we flick left the contentX becomes negative.
+++        // This results in the first iitem being index -savedPos.
+++        // To fix this we add savedPos to make the first item at index zero.
+++        positionViewAtIndex(savedPos, ListView.Visible)
++     }
++ 
++     onContentXChanged: {
++-        var lowerStop = Math.floor(contentX/appsListView.width)
+++        var lowerStop = Math.floor(contentX/appsListView.width) + savedPos
++         var upperStop = lowerStop+1
++-        var ratio = (contentX%appsListView.width)/appsListView.width
+++        var ratio = ((contentX + savedPos*appsListView.width)%appsListView.width)/appsListView.width
++ 
++         if(upperStop + 1 > launcherModel.itemCount || ratio == 0) {
++             launcherCenterColor = alb.centerColor(launcherModel.get(lowerStop).filePath);
++-- 
++2.26.0
++
 diff --git a/recipes-asteroid/asteroid-launcher/asteroid-launcher_git.bb b/recipes-asteroid/asteroid-launcher/asteroid-launcher_git.bb
-index 43052cd..3ec0da7 100644
+index 43052cd..158f2cd 100644
 --- a/recipes-asteroid/asteroid-launcher/asteroid-launcher_git.bb
 +++ b/recipes-asteroid/asteroid-launcher/asteroid-launcher_git.bb
-@@ -3,7 +3,7 @@ HOMEPAGE = "https://github.com/AsteroidOS/asteroid-launcher"
- LICENSE = "BSD"
+@@ -4,6 +4,7 @@ LICENSE = "BSD"
  LIC_FILES_CHKSUM = "file://qml/MainScreen.qml;beginline=1;endline=29;md5=3d250dd089f5d6221d9054029963e332"
  
--SRC_URI = "git://github.com/AsteroidOS/asteroid-launcher.git;protocol=https \
-+SRC_URI = "git://github.com/MagneFire/asteroid-launcher.git;protocol=https \
+ SRC_URI = "git://github.com/AsteroidOS/asteroid-launcher.git;protocol=https \
++    file://0001-Save-the-AppLauncher-item-position.patch \
      file://asteroid-launcher.service \
      file://default.conf"
  SRC_URI_append_qemux86 = " file://qemu.conf file://kms-qemu.json"
+diff --git a/recipes-asteroid/asteroid-music/asteroid-music_git.bb b/recipes-asteroid/asteroid-music/asteroid-music_git.bb
+index 2ab923c..92a3454 100644
+--- a/recipes-asteroid/asteroid-music/asteroid-music_git.bb
++++ b/recipes-asteroid/asteroid-music/asteroid-music_git.bb
+@@ -3,7 +3,7 @@ HOMEPAGE = "https://github.com/AsteroidOS/asteroid-music.git"
+ LICENSE = "GPLv3"
+ LIC_FILES_CHKSUM = "file://LICENSE;md5=84dcc94da3adb52b53ae4fa38fe49e5d"
+ 
+-SRC_URI = "git://github.com/AsteroidOS/asteroid-music.git;protocol=https"
++SRC_URI = "git://github.com/MagneFire/asteroid-music.git;protocol=https"
+ SRCREV = "${AUTOREV}"
+ PR = "r1"
+ PV = "+git${SRCPV}"
+diff --git a/recipes-asteroid/asteroid-settings/asteroid-settings_git.bb b/recipes-asteroid/asteroid-settings/asteroid-settings_git.bb
+index 5713667..72b3835 100644
+--- a/recipes-asteroid/asteroid-settings/asteroid-settings_git.bb
++++ b/recipes-asteroid/asteroid-settings/asteroid-settings_git.bb
+@@ -1,9 +1,9 @@
+ SUMMARY = "Asteroid's system settings app"
+-HOMEPAGE = "https://github.com/AsteroidOS/asteroid-settings.git"
++HOMEPAGE = "https://github.com/MagneFire/asteroid-settings.git"
+ LICENSE = "GPLv3"
+ LIC_FILES_CHKSUM = "file://LICENSE;md5=84dcc94da3adb52b53ae4fa38fe49e5d"
+ 
+-SRC_URI = "git://github.com/AsteroidOS/asteroid-settings.git;protocol=https"
++SRC_URI = "git://github.com/MagneFire/asteroid-settings.git;protocol=https"
+ SRCREV = "${AUTOREV}"
+ PR = "r1"
+ PV = "+git${SRCPV}"

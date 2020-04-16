@@ -1,5 +1,5 @@
 diff --git a/conf/machine/sturgeon.conf b/conf/machine/sturgeon.conf
-index a4c4d21..f3a6c47 100644
+index a4c4d21..3882ede 100644
 --- a/conf/machine/sturgeon.conf
 +++ b/conf/machine/sturgeon.conf
 @@ -16,4 +16,4 @@ PREFERRED_VERSION_android = "marshmallow"
@@ -7,4 +7,24 @@ index a4c4d21..f3a6c47 100644
  PREFERRED_VERSION_linux = "3.10+marshmallow"
  
 -IMAGE_INSTALL += "msm-fb-refresher brcm-patchram-plus iproute2 wpa-supplicant underclock asteroid-hrm"
-+IMAGE_INSTALL += "msm-fb-refresher brcm-patchram-plus iproute2 wpa-supplicant underclock asteroid-hrm strace gpsp-menu gpsp gearboy vbam mgba quake"
++IMAGE_INSTALL += "msm-fb-refresher brcm-patchram-plus iproute2 wpa-supplicant underclock asteroid-hrm strace gdb gpsp-menu gpsp gearboy vbam mgba quake retroarch"
+diff --git a/recipes-asteroid/asteroid-imu-test/asteroid-imu-test_git.bb b/recipes-asteroid/asteroid-imu-test/asteroid-imu-test_git.bb
+new file mode 100755
+index 0000000..2d6c271
+--- /dev/null
++++ b/recipes-asteroid/asteroid-imu-test/asteroid-imu-test_git.bb
+@@ -0,0 +1,14 @@
++SUMMARY = "Asteroid's IMU test app"
++HOMEPAGE = "https://github.com/AsteroidOS/asteroid-imu-test.git"
++LICENSE = "GPLv3"
++LIC_FILES_CHKSUM = "file://LICENSE;md5=84dcc94da3adb52b53ae4fa38fe49e5d"
++
++SRC_URI = "git://github.com/AsteroidOS/asteroid-imu-test.git;protocol=https"
++SRCREV = "${AUTOREV}"
++PR = "r1"
++PV = "+git${SRCPV}"
++S = "${WORKDIR}/git"
++inherit qmake5
++
++DEPENDS += "qml-asteroid qtdeclarative-native"
++RDEPENDS_${PN} += "qtsensors qtsensors-qmlplugins qtsensors-plugins"
