@@ -89,8 +89,9 @@ else
     clone_dir src/meta-swift-hybris    https://github.com/AsteroidOS/meta-swift-hybris       master
     clone_dir src/meta-tetra-hybris    https://github.com/AsteroidOS/meta-tetra-hybris       master
     clone_dir src/meta-wren-hybris     https://github.com/AsteroidOS/meta-wren-hybris        master
-    clone_dir src/meta-asteroid        https://github.com/MagneFire/meta-asteroid            master
+    clone_dir src/meta-asteroid        https://github.com/AsteroidOS/meta-asteroid            master
     clone_dir src/meta-sturgeon-hybris https://github.com/MagneFire/meta-sturgeon-hybris     master
+    clone_dir src/meta-smelt-hybris    https://github.com/MagneFire/meta-smelt-hybris        master
     clone_dir src/meta-games           https://github.com/MagneFire/meta-games               master
 
     # Create local.conf and bblayers.conf on first run
@@ -123,6 +124,7 @@ BBLAYERS = " \
   ${SRCDIR}/meta-bass-hybris \
   ${SRCDIR}/meta-dory-hybris \
   ${SRCDIR}/meta-lenok-hybris \
+  ${SRCDIR}/meta-smelt-hybris \
   ${SRCDIR}/meta-sturgeon-hybris \
   ${SRCDIR}/meta-mtk6580-hybris \
   ${SRCDIR}/meta-mooneye-hybris \
