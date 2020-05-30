@@ -54,6 +54,98 @@ index 0000000..ba8b79c
 +    cp ${S}/i18n/asteroid-audiod.*.qm ${D}/usr/share/translations/
 +}
 +
+diff --git a/recipes-asteroid/asteroid-flashlight/asteroid-flashlight/0001-WIP-Set-brightness-to-maximum-brightness-when-on.patch b/recipes-asteroid/asteroid-flashlight/asteroid-flashlight/0001-WIP-Set-brightness-to-maximum-brightness-when-on.patch
+new file mode 100644
+index 0000000..ebb91c3
+--- /dev/null
++++ b/recipes-asteroid/asteroid-flashlight/asteroid-flashlight/0001-WIP-Set-brightness-to-maximum-brightness-when-on.patch
+@@ -0,0 +1,58 @@
++From 76043dfc46a41f89e4446b8bc3fd473aaf4eec74 Mon Sep 17 00:00:00 2001
++From: MagneFire <IDaNLContact@gmail.com>
++Date: Fri, 10 Apr 2020 21:07:30 +0200
++Subject: [PATCH] WIP: Set brightness to maximum brightness when on. Mostly
++ works.
++
++There appears to be a bug where onDestruction() isn't called on shutdown.
++---
++ main.qml | 15 +++++++++++++++
++ 1 file changed, 15 insertions(+)
++
++diff --git a/main.qml b/main.qml
++index 34469be..6bae6cc 100644
++--- a/main.qml
+++++ b/main.qml
++@@ -17,11 +17,23 @@
++ 
++ import QtQuick 2.9
++ import org.asteroid.controls 1.0
+++import org.nemomobile.systemsettings 1.0
++ import Nemo.KeepAlive 1.1
++ 
++ Application {
++     centerColor: "#b04d1c"
++     outerColor: "#421c0a"
+++    property int startBrightness: -1
+++
+++    DisplaySettings {
+++        id: displaySettings
+++        onBrightnessChanged: {
+++            if (startBrightness == -1) {
+++                startBrightness = brightness
+++                displaySettings.brightness = displaySettings.maximumBrightness
+++            }
+++        }
+++    }
++ 
++     Rectangle {
++         id: whiteOverlay
++@@ -50,12 +62,15 @@ Application {
++                 onOffAnimation.from = 1
++                 onOffAnimation.to = 0
++                 onOffAnimation.start()
+++                displaySettings.brightness = startBrightness
++             } else {
++                 onOffAnimation.from = 0
++                 onOffAnimation.to = 1
++                 onOffAnimation.start()
+++                displaySettings.brightness = displaySettings.maximumBrightness
++             }
++         }
++     }
++     Component.onCompleted: DisplayBlanking.preventBlanking = true
+++    Component.onDestruction: displaySettings.brightness = startBrightness
++ }
++-- 
++2.26.1
++
+diff --git a/recipes-asteroid/asteroid-flashlight/asteroid-flashlight_git.bb b/recipes-asteroid/asteroid-flashlight/asteroid-flashlight_git.bb
+index 242244a..8fc0935 100644
+--- a/recipes-asteroid/asteroid-flashlight/asteroid-flashlight_git.bb
++++ b/recipes-asteroid/asteroid-flashlight/asteroid-flashlight_git.bb
+@@ -3,7 +3,9 @@ HOMEPAGE = "https://github.com/AsteroidOS/asteroid-flashlight.git"
+ LICENSE = "GPLv3"
+ LIC_FILES_CHKSUM = "file://LICENSE;md5=84dcc94da3adb52b53ae4fa38fe49e5d"
+ 
+-SRC_URI = "git://github.com/AsteroidOS/asteroid-flashlight.git;protocol=https"
++SRC_URI = "git://github.com/AsteroidOS/asteroid-flashlight.git;protocol=https \
++    file://0001-WIP-Set-brightness-to-maximum-brightness-when-on.patch \
++"
+ SRCREV = "${AUTOREV}"
+ PR = "r1"
+ PV = "+git${SRCPV}"
+diff --git a/recipes-asteroid/asteroid-icons/asteroid-icons-ion_git.bb b/recipes-asteroid/asteroid-icons/asteroid-icons-ion_git.bb
+index fb779de..7337d51 100644
+--- a/recipes-asteroid/asteroid-icons/asteroid-icons-ion_git.bb
++++ b/recipes-asteroid/asteroid-icons/asteroid-icons-ion_git.bb
+@@ -3,7 +3,7 @@ HOMEPAGE = "https://github.com/AsteroidOS/asteroid-icons-ion"
+ LICENSE = "MIT"
+ LIC_FILES_CHKSUM = "file://LICENSE;md5=92e02b7236a0635eaf1478f8041b0602"
+ 
+-SRC_URI = "git://github.com/AsteroidOS/asteroid-icons-ion;protocol=https"
++SRC_URI = "git://github.com/MagneFire/asteroid-icons-ion;protocol=https"
+ SRCREV = "${AUTOREV}"
+ PR = "r1"
+ PV = "+git${SRCPV}"
 diff --git a/recipes-asteroid/asteroid-launcher/asteroid-launcher/0001-Save-the-AppLauncher-item-position.patch b/recipes-asteroid/asteroid-launcher/asteroid-launcher/0001-Save-the-AppLauncher-item-position.patch
 new file mode 100644
 index 0000000..a222924
@@ -144,15 +236,365 @@ index 0000000..a222924
 +-- 
 +2.26.0
 +
+diff --git a/recipes-asteroid/asteroid-launcher/asteroid-launcher/0002-compositor-Close-current-active-window-when-another-.patch b/recipes-asteroid/asteroid-launcher/asteroid-launcher/0002-compositor-Close-current-active-window-when-another-.patch
+new file mode 100644
+index 0000000..a6bdf1d
+--- /dev/null
++++ b/recipes-asteroid/asteroid-launcher/asteroid-launcher/0002-compositor-Close-current-active-window-when-another-.patch
+@@ -0,0 +1,29 @@
++From a01b7da059c445e9eed1d13b39a9b981a1ef98ca Mon Sep 17 00:00:00 2001
++From: MagneFire <IDaNLContact@gmail.com>
++Date: Tue, 21 Apr 2020 16:19:15 +0200
++Subject: [PATCH] compositor: Close current active window when another window
++ is opened. Only one active app window is allowed. Adding a new window forces
++ the current window to vanish to the background. Make sure that this window is
++ stopped.
++
++---
++ qml/compositor/compositor.qml | 3 +++
++ 1 file changed, 3 insertions(+)
++
++diff --git a/qml/compositor/compositor.qml b/qml/compositor/compositor.qml
++index fee7280..751dea3 100644
++--- a/qml/compositor/compositor.qml
+++++ b/qml/compositor/compositor.qml
++@@ -221,6 +221,9 @@ Item {
++                 comp.homeWindow = w
++                 setCurrentWindow(homeWindow)
++             } else if (!isNotificationWindow && !isAgentWindow && !isDialogWindow) {
+++                if (topmostApplicationWindow != null) {
+++                    Lipstick.compositor.closeClientForWindowId(topmostApplicationWindow.window.windowId)
+++                }
++                 w.smoothBorders = true
++                 w.x = width
++                 w.moveInAnim.start()
++-- 
++2.26.1
++
+diff --git a/recipes-asteroid/asteroid-launcher/asteroid-launcher/0003-compositor-Play-notification-sound.patch b/recipes-asteroid/asteroid-launcher/asteroid-launcher/0003-compositor-Play-notification-sound.patch
+new file mode 100644
+index 0000000..e4303a2
+--- /dev/null
++++ b/recipes-asteroid/asteroid-launcher/asteroid-launcher/0003-compositor-Play-notification-sound.patch
+@@ -0,0 +1,46 @@
++From fccc8965300cdd804b7eacae407ebc6ccb294cca Mon Sep 17 00:00:00 2001
++From: MagneFire <IDaNLContact@gmail.com>
++Date: Tue, 28 Apr 2020 17:25:22 +0200
++Subject: [PATCH] compositor: Play notification sound.
++ /usr/share/sounds/notification.wav will be played if it exists and a
++ notification arrives.
++
++---
++ qml/compositor/compositor.qml | 7 +++++++
++ 1 file changed, 7 insertions(+)
++
++diff --git a/qml/compositor/compositor.qml b/qml/compositor/compositor.qml
++index 751dea3..76c3875 100644
++--- a/qml/compositor/compositor.qml
+++++ b/qml/compositor/compositor.qml
++@@ -32,6 +32,7 @@
++ 
++ import QtQuick 2.9
++ import QtQuick.Window 2.1
+++import QtMultimedia 5.4
++ import org.nemomobile.lipstick 0.1
++ import org.asteroid.controls 1.0
++ import org.asteroid.utils 1.0
++@@ -43,6 +44,11 @@ Item {
++     anchors.fill: parent
++     rotation: Screen.angleBetween(Screen.primaryScreen, Lipstick.compositor.screenOrientation)
++ 
+++    Audio {
+++        id: notificationSound
+++        source: "file:///usr/share/sounds/notification.wav"
+++    }
+++
++     Item {
++         id: homeLayer
++         z: 1
++@@ -208,6 +214,7 @@ Item {
++                 parent = homeLayer
++             } else if (isNotificationWindow) {
++                 parent = notificationLayer
+++                notificationSound.play()
++             } else if (isAgentWindow) {
++                 parent = agentLayer
++             } else {
++-- 
++2.26.2
++
+diff --git a/recipes-asteroid/asteroid-launcher/asteroid-launcher/0004-disable-indicators.patch b/recipes-asteroid/asteroid-launcher/asteroid-launcher/0004-disable-indicators.patch
+new file mode 100644
+index 0000000..3e24983
+--- /dev/null
++++ b/recipes-asteroid/asteroid-launcher/asteroid-launcher/0004-disable-indicators.patch
+@@ -0,0 +1,19 @@
++diff --git a/qml/MainScreen.qml b/qml/MainScreen.qml
++index 086b745..35f7fc3 100644
++--- a/qml/MainScreen.qml
+++++ b/qml/MainScreen.qml
++@@ -118,10 +118,10 @@ Item {
++             var np = addPanel(-1, 0, leftPanel)
++             addPanel(0, -1, topPanel)
++ 
++-            rightIndicator.visible  = Qt.binding(function() { return grid.toLeftAllowed   || (grid.currentVerticalPos == 1 && al.toLeftAllowed )})
++-            leftIndicator.visible   = Qt.binding(function() { return grid.toRightAllowed  || (grid.currentVerticalPos == 1 && al.toRightAllowed)})
++-            topIndicator.visible    = Qt.binding(function() { return grid.toBottomAllowed    })
++-            bottomIndicator.visible = Qt.binding(function() { return grid.toTopAllowed })
+++            rightIndicator.visible  = Qt.binding(function() { return ((grid.toLeftAllowed   || (grid.currentVerticalPos == 1 && al.toLeftAllowed )) && 0)})
+++            leftIndicator.visible   = Qt.binding(function() { return ((grid.toRightAllowed  || (grid.currentVerticalPos == 1 && al.toRightAllowed)) && 0)})
+++            topIndicator.visible    = Qt.binding(function() { return (grid.toBottomAllowed && 0)   })
+++            bottomIndicator.visible = Qt.binding(function() { return (grid.toTopAllowed  && 0)})
++ 
++             leftIndicator.keepExpanded = Qt.binding(function() { return !np.modelEmpty && grid.currentHorizontalPos == 0 && grid.currentVerticalPos == 0 })
++ 
+diff --git a/recipes-asteroid/asteroid-launcher/asteroid-launcher/0005-WIP-burn-in-protection.patch b/recipes-asteroid/asteroid-launcher/asteroid-launcher/0005-WIP-burn-in-protection.patch
+new file mode 100644
+index 0000000..11d4c1b
+--- /dev/null
++++ b/recipes-asteroid/asteroid-launcher/asteroid-launcher/0005-WIP-burn-in-protection.patch
+@@ -0,0 +1,231 @@
++From af5b90a49483c8f30f14453bf79538e26b4c5045 Mon Sep 17 00:00:00 2001
++From: MagneFire <IDaNLContact@gmail.com>
++Date: Thu, 21 May 2020 22:17:15 +0200
++Subject: [PATCH] WIP: AmbientMode: Add support for ambient mode. Currently has
++ a minimal burn in protection function. And updates the screen when a Lipstick
++ ambient update arrives.
++
++TODO:
++- Currently the display goes to quickly to sleep, because the Canvas component hasnt finalized painting.
++- Design proper AmbientMode API (onAmbientEnter, onAmbientUpdate).
++- Figure out how to update the watchface before going to sleep. But do not depend on watchfaces to go to sleep(i.e. timeout).
++---
++ qml/MainScreen.qml            | 114 ++++++++++++++++++++++------------
++ qml/compositor/compositor.qml |   5 +-
++ qml/misc/desktop.js           |   9 +++
++ 3 files changed, 88 insertions(+), 40 deletions(-)
++
++diff --git a/qml/MainScreen.qml b/qml/MainScreen.qml
++index 086b745..f36326d 100644
++--- a/qml/MainScreen.qml
+++++ b/qml/MainScreen.qml
++@@ -53,7 +53,9 @@ Item {
++     property var launcherOuterColor: defaultOuterColor
++ 
++     Component.onCompleted: {
+++        console.log("onCompleted: desktop");
++         Desktop.panelsGrid = grid
+++        Desktop.wallpaper = wallpaper
++         LipstickSettings.lockScreen(true)
++         if(firstRun.isFirstRun())
++             firstRunComponent.createObject(desktop)
++@@ -81,10 +83,46 @@ Item {
++         defaultValue: false
++     }
++ 
+++    Timer {
+++        id: lockscreenDelay
+++        interval: 150
+++        repeat: false
+++        onTriggered: {
+++            console.log("!!!!UPDATE!!!!")
+++            if (Lipstick.compositor.ambientEnabled) Desktop.onAboutToEnterAmbient()
+++        }
+++    }
+++
++     Connections {
++         target: Lipstick.compositor
+++        onDisplayOn: {
+++            // In ambient mode we slightly move the grid to prevent burn in.
+++            // Restore grid to center pane.
+++            if (Lipstick.compositor.ambientEnabled) grid.moveTo(0, 0)
+++            console.log("onDisplayOn!!");
+++        }
+++        onDisplayOff: {
+++            console.log("UPDATE!!!!")
+++            lockscreenDelay.start();
+++        }
++         onDisplayAboutToBeOn: wallClock.enabled = true
++         onDisplayAboutToBeOff: wallClock.enabled = false
+++        onDisplayAmbientEntered: {
+++            console.log("AMBIENT MODE ENTER! " + Lipstick.compositor.displayAmbient);
+++            wallpaperAnimation.duration = 400
+++            wallpaperDarkener.opacity = 1;
+++        }
+++        onDisplayAmbientLeft: {
+++            console.log("AMBIENT MODE LEAVE! " + Lipstick.compositor.displayAmbient);
+++            wallpaperAnimation.duration = 400
+++            wallpaperDarkener.opacity = 0;
+++        }
+++        onDisplayAmbientUpdate: {
+++            console.log("Update DISPLAY AMBIENT!! " + Lipstick.compositor.displayAmbient)
+++            // Screen updated, let it turn off :)
+++            Desktop.onAboutToEnterAmbient()
+++            Lipstick.compositor.setUpdatesEnabled(false)
+++        }
++     }
++ 
++     ConfigurationValue {
++@@ -118,10 +156,10 @@ Item {
++             var np = addPanel(-1, 0, leftPanel)
++             addPanel(0, -1, topPanel)
++ 
++-            rightIndicator.visible  = Qt.binding(function() { return grid.toLeftAllowed   || (grid.currentVerticalPos == 1 && al.toLeftAllowed )})
++-            leftIndicator.visible   = Qt.binding(function() { return grid.toRightAllowed  || (grid.currentVerticalPos == 1 && al.toRightAllowed)})
++-            topIndicator.visible    = Qt.binding(function() { return grid.toBottomAllowed    })
++-            bottomIndicator.visible = Qt.binding(function() { return grid.toTopAllowed })
+++            rightIndicator.visible  = Qt.binding(function() { return ((grid.toLeftAllowed   || (grid.currentVerticalPos == 1 && al.toLeftAllowed )) && 0)})
+++            leftIndicator.visible   = Qt.binding(function() { return ((grid.toRightAllowed  || (grid.currentVerticalPos == 1 && al.toRightAllowed)) && 0)})
+++            topIndicator.visible    = Qt.binding(function() { return (grid.toBottomAllowed && 0)   })
+++            bottomIndicator.visible = Qt.binding(function() { return (grid.toTopAllowed  && 0)})
++ 
++             leftIndicator.keepExpanded = Qt.binding(function() { return !np.modelEmpty && grid.currentHorizontalPos == 0 && grid.currentVerticalPos == 0 })
++ 
++@@ -129,34 +167,40 @@ Item {
++         }
++ 
++         onNormalizedHorOffsetChanged: {
+++            if (!Lipstick.compositor.displayAmbient) {
+++                wallpaperAnimation.duration = 0
++                 wallpaper.anchors.horizontalCenterOffset = normalizedHorOffset*width*(-0.05)
++                 wallpaperDarkener.opacity = Math.abs(normalizedHorOffset)*0.4
+++            }
++         }
++         onNormalizedVerOffsetChanged: {
++-            wallpaper.anchors.verticalCenterOffset = height*normalizedVerOffset*(-0.05)
++-
++-            if(normalizedVerOffset == 1) {
++-                bgCenterColor = Qt.binding(function() { return launcherCenterColor })
++-                bgOuterColor = Qt.binding(function() { return launcherOuterColor })
++-            }
++-
++-            else if(normalizedVerOffset > 0) {
++-                bgCenterColor = Qt.rgba(
++-                            launcherCenterColor.r * normalizedVerOffset + defaultCenterColor.r * (1-normalizedVerOffset),
++-                            launcherCenterColor.g * normalizedVerOffset + defaultCenterColor.g * (1-normalizedVerOffset),
++-                            launcherCenterColor.b * normalizedVerOffset + defaultCenterColor.b * (1-normalizedVerOffset)
++-                        );
++-
++-                bgOuterColor = Qt.rgba(
++-                            launcherOuterColor.r * normalizedVerOffset + defaultOuterColor.r * (1-normalizedVerOffset),
++-                            launcherOuterColor.g * normalizedVerOffset + defaultOuterColor.g * (1-normalizedVerOffset),
++-                            launcherOuterColor.b * normalizedVerOffset + defaultOuterColor.b * (1-normalizedVerOffset)
++-                        );
++-            }
++-            else {
++-                bgCenterColor = Qt.binding(function() { return defaultCenterColor })
++-                bgOuterColor = Qt.binding(function() { return defaultOuterColor })
++-                wallpaperDarkener.opacity = Math.abs(normalizedVerOffset)*0.4
+++            if (!Lipstick.compositor.displayAmbient) {
+++                wallpaperAnimation.duration = 0
+++                wallpaper.anchors.verticalCenterOffset = height*normalizedVerOffset*(-0.05)
+++
+++                if(normalizedVerOffset == 1) {
+++                    bgCenterColor = Qt.binding(function() { return launcherCenterColor })
+++                    bgOuterColor = Qt.binding(function() { return launcherOuterColor })
+++                }
+++
+++                else if(normalizedVerOffset > 0) {
+++                    bgCenterColor = Qt.rgba(
+++                                launcherCenterColor.r * normalizedVerOffset + defaultCenterColor.r * (1-normalizedVerOffset),
+++                                launcherCenterColor.g * normalizedVerOffset + defaultCenterColor.g * (1-normalizedVerOffset),
+++                                launcherCenterColor.b * normalizedVerOffset + defaultCenterColor.b * (1-normalizedVerOffset)
+++                            );
+++
+++                    bgOuterColor = Qt.rgba(
+++                                launcherOuterColor.r * normalizedVerOffset + defaultOuterColor.r * (1-normalizedVerOffset),
+++                                launcherOuterColor.g * normalizedVerOffset + defaultOuterColor.g * (1-normalizedVerOffset),
+++                                launcherOuterColor.b * normalizedVerOffset + defaultOuterColor.b * (1-normalizedVerOffset)
+++                            );
+++                }
+++                else {
+++                    bgCenterColor = Qt.binding(function() { return defaultCenterColor })
+++                    bgOuterColor = Qt.binding(function() { return defaultOuterColor })
+++                    wallpaperDarkener.opacity = Math.abs(normalizedVerOffset)*0.4
+++                }
++             }
++         }
++     }
++@@ -175,17 +219,6 @@ Item {
++     Indicator { id: topIndicator; edge: Qt.TopEdge }
++     Indicator { id: bottomIndicator; edge: Qt.BottomEdge }
++ 
++-    Timer {
++-        id: lockscreenDelay
++-        interval: 150
++-        repeat: false
++-        onTriggered: Desktop.onAboutToClose()
++-    }
++-    Connections {
++-        target: Lipstick.compositor
++-        onDisplayOff: lockscreenDelay.start();
++-     }
++-
++ // Wallpaper
++     ConfigurationValue {
++         id: wallpaperSource
++@@ -214,6 +247,7 @@ Item {
++         z: -100
++         anchors.verticalCenter: parent.verticalCenter
++         anchors.horizontalCenter: parent.horizontalCenter
+++        Behavior on opacity { NumberAnimation { duration: 400 } }
++ 
++         Component {
++             id: imageWallpaper
++@@ -232,5 +266,7 @@ Item {
++         z: -99
++         color: "#000000"
++         opacity: 0.0
+++        visible: opacity != 0.0
+++        Behavior on opacity { NumberAnimation { id:wallpaperAnimation } }
++     }
++ }
++diff --git a/qml/compositor/compositor.qml b/qml/compositor/compositor.qml
++index 751dea3..f167ab5 100644
++--- a/qml/compositor/compositor.qml
+++++ b/qml/compositor/compositor.qml
++@@ -144,7 +144,10 @@ Item {
++         id: delayTimer
++         interval: 5000
++         repeat: false
++-        onTriggered: Lipstick.compositor.closeClientForWindowId(comp.topmostWindow.window.windowId)
+++        onTriggered: {
+++            Lipstick.compositor.closeClientForWindowId(comp.topmostWindow.window.windowId)
+++            Lipstick.compositor.updateAmbientDisplay()
+++        }
++     }
++ 
++     Compositor {
++diff --git a/qml/misc/desktop.js b/qml/misc/desktop.js
++index 4c7742e..d4b1438 100644
++--- a/qml/misc/desktop.js
+++++ b/qml/misc/desktop.js
++@@ -1,6 +1,15 @@
++ .pragma library
++ var panelsGrid
++ var appLauncher
+++var wallpaper
++ 
++ function onAboutToClose() { panelsGrid.moveTo(0, 0) }
+++function onAboutToEnterAmbient() {
+++
+++    panelsGrid.contentX = Math.random()*10-5;
+++    panelsGrid.contentY = Math.random()*10-5;
+++
+++    wallpaper.anchors.horizontalCenterOffset = panelsGrid.contentX;
+++    wallpaper.anchors.verticalCenterOffset = panelsGrid.contentY;
+++}
++ function onAboutToMinimize() { panelsGrid.moveTo(0, 1) }
++-- 
++2.26.2
++
 diff --git a/recipes-asteroid/asteroid-launcher/asteroid-launcher_git.bb b/recipes-asteroid/asteroid-launcher/asteroid-launcher_git.bb
-index 43052cd..158f2cd 100644
+index 43052cd..26a5ea6 100644
 --- a/recipes-asteroid/asteroid-launcher/asteroid-launcher_git.bb
 +++ b/recipes-asteroid/asteroid-launcher/asteroid-launcher_git.bb
-@@ -4,6 +4,7 @@ LICENSE = "BSD"
+@@ -4,6 +4,8 @@ LICENSE = "BSD"
  LIC_FILES_CHKSUM = "file://qml/MainScreen.qml;beginline=1;endline=29;md5=3d250dd089f5d6221d9054029963e332"
  
  SRC_URI = "git://github.com/AsteroidOS/asteroid-launcher.git;protocol=https \
 +    file://0001-Save-the-AppLauncher-item-position.patch \
++    file://0005-WIP-burn-in-protection.patch \
      file://asteroid-launcher.service \
      file://default.conf"
  SRC_URI_append_qemux86 = " file://qemu.conf file://kms-qemu.json"
@@ -185,3 +627,1115 @@ index 5713667..72b3835 100644
  SRCREV = "${AUTOREV}"
  PR = "r1"
  PV = "+git${SRCPV}"
+diff --git a/recipes-asteroid/qml-asteroid/qml-asteroid/0001-disable-indicators.patch b/recipes-asteroid/qml-asteroid/qml-asteroid/0001-disable-indicators.patch
+new file mode 100644
+index 0000000..0b313a6
+--- /dev/null
++++ b/recipes-asteroid/qml-asteroid/qml-asteroid/0001-disable-indicators.patch
+@@ -0,0 +1,21 @@
++diff --git a/src/controls/qml/Application.qml b/src/controls/qml/Application.qml
++index ae4ab96..dd5ee8b 100644
++--- a/src/controls/qml/Application.qml
+++++ b/src/controls/qml/Application.qml
++@@ -52,14 +52,14 @@ Application_p {
++     Indicator {
++         id: leftIndicator
++         edge: Qt.LeftEdge
++-        visible: true
+++        visible: false
++         z: 10
++     }
++ 
++     Indicator {
++         id: topIndicator
++         edge: Qt.TopEdge
++-        visible: true
+++        visible: false
++         z: 10
++     }
++ 
+diff --git a/recipes-asteroid/qml-asteroid/qml-asteroid_git.bb b/recipes-asteroid/qml-asteroid/qml-asteroid_git.bb
+index 5e894d8..f2015b3 100644
+--- a/recipes-asteroid/qml-asteroid/qml-asteroid_git.bb
++++ b/recipes-asteroid/qml-asteroid/qml-asteroid_git.bb
+@@ -3,7 +3,9 @@ HOMEPAGE = "https://github.com/AsteroidOS/qml-asteroid.git"
+ LICENSE = "LGPL-2.1"
+ LIC_FILES_CHKSUM = "file://COPYING;md5=1702a92c723f09e3fab3583b165a8d90"
+ 
+-SRC_URI = "git://github.com/AsteroidOS/qml-asteroid.git;protocol=https"
++SRC_URI = "git://github.com/AsteroidOS/qml-asteroid.git;protocol=https \
++    file://0001-disable-indicators.patch \
++"
+ SRC_URI_append_qemux86 = " file://0001-Spinners-Disable-shaders-which-cause-all-sorts-of-pr.patch"
+ SRCREV = "${AUTOREV}"
+ PR = "r1"
+diff --git a/recipes-nemomobile/lipstick/lipstick/0006-dont-turnoff-display.patch b/recipes-nemomobile/lipstick/lipstick/0006-dont-turnoff-display.patch
+new file mode 100644
+index 0000000..2a9f39f
+--- /dev/null
++++ b/recipes-nemomobile/lipstick/lipstick/0006-dont-turnoff-display.patch
+@@ -0,0 +1,17 @@
++diff --git a/src/compositor/lipstickcompositor.cpp b/src/compositor/lipstickcompositor.cpp
++index bac05044..b8591b49 100644
++--- a/src/compositor/lipstickcompositor.cpp
+++++ b/src/compositor/lipstickcompositor.cpp
++@@ -713,10 +713,10 @@ void LipstickCompositor::setUpdatesEnabled(bool enabled)
++                 m_onUpdatesDisabledUnfocusedWindowId = topmostWindow->windowId();
++                 clearKeyboardFocus();
++             }
++-            m_window->hide();
++             if (m_window->handle()) {
++-                QGuiApplication::platformNativeInterface()->nativeResourceForIntegration("DisplayOff");
+++                QGuiApplication::platformNativeInterface()->nativeResourceForIntegration("DisplayOff"); // THIS IS INTERESTING!
++             }
+++            m_window->hide();
++             // trigger frame callbacks which are pending already at this time
++             surfaceCommitted();
++         } else {
+diff --git a/recipes-nemomobile/lipstick/lipstick/0006-freeze-renderer-on-ambient-mode.patch b/recipes-nemomobile/lipstick/lipstick/0006-freeze-renderer-on-ambient-mode.patch
+new file mode 100644
+index 0000000..40490f5
+--- /dev/null
++++ b/recipes-nemomobile/lipstick/lipstick/0006-freeze-renderer-on-ambient-mode.patch
+@@ -0,0 +1,322 @@
++From 060b214436d8f0af3421ec2bd4276ec1d25d8e6b Mon Sep 17 00:00:00 2001
++From: MagneFire <IDaNLContact@gmail.com>
++Date: Tue, 26 May 2020 15:50:51 +0200
++Subject: [PATCH] WIP: Ambient mode.
++
++---
++ src/compositor/compositor.xml         |  11 ++
++ src/compositor/lipstickcompositor.cpp | 139 ++++++++++++++++++++++++++
++ src/compositor/lipstickcompositor.h   |  29 +++++-
++ src/src.pro                           |   2 +
++ 4 files changed, 180 insertions(+), 1 deletion(-)
++
++diff --git a/src/compositor/compositor.xml b/src/compositor/compositor.xml
++index 98f1430f..3a04c948 100644
++--- a/src/compositor/compositor.xml
+++++ b/src/compositor/compositor.xml
++@@ -1,6 +1,17 @@
++ <!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN" "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
++ <node>
++   <interface name="org.nemomobile.compositor">
+++    <method name="ambientSupported">
+++      <arg name="enabled" type="b" direction="out"/>
+++    </method>
+++    <method name="setAmbientEnabled">
+++      <arg name="enabled" type="b" direction="in"/>
+++    </method>
+++    <signal name="ambientEnabled">
+++      <arg name="enabled" type="b"/>
+++    </signal>
+++    <method name="updateAmbientDisplay">
+++    </method>
++     <method name="setUpdatesEnabled">
++       <arg name="enabled" type="b" direction="in"/>
++     </method>
++diff --git a/src/compositor/lipstickcompositor.cpp b/src/compositor/lipstickcompositor.cpp
++index bac05044..1c629142 100644
++--- a/src/compositor/lipstickcompositor.cpp
+++++ b/src/compositor/lipstickcompositor.cpp
++@@ -37,6 +37,9 @@
++ #include <QWaylandQuickShellSurfaceItem>
++ #include <QtWaylandCompositor/private/qwlextendedsurface_p.h>
++ 
+++//#include <time.h>
+++
+++
++ LipstickCompositor *LipstickCompositor::m_instance = 0;
++ 
++ LipstickCompositor::LipstickCompositor()
++@@ -113,6 +116,12 @@ LipstickCompositor::LipstickCompositor()
++ 
++     HwcRenderStage::initialize(this);
++ 
+++    m_timedDbus = new Maemo::Timed::Interface();
+++    if( !m_timedDbus->isValid() )
+++    {
+++      qWarning() << "invalid dbus interface:" << m_timedDbus->lastError();
+++    }
+++
++     QTimer::singleShot(0, this, SLOT(initialize()));
++ }
++ 
++@@ -122,6 +131,7 @@ LipstickCompositor::~LipstickCompositor()
++     // are destroyed, so disconnect it.
++     disconnect(m_window, SIGNAL(visibleChanged(bool)), this, SLOT(onVisibleChanged(bool)));
++ 
+++    delete m_timedDbus;
++     delete m_shaderEffect;
++ }
++ 
++@@ -400,6 +410,7 @@ void LipstickCompositor::initialize()
++     if (!systemBus.registerObject("/", this)) {
++         qWarning("Unable to register object at path /: %s", systemBus.lastError().message().toUtf8().constData());
++     }
+++    setAmbientEnabled(true);
++ }
++ 
++ void LipstickCompositor::windowDestroyed(LipstickCompositorWindow *item)
++@@ -651,11 +662,25 @@ void LipstickCompositor::reactOnDisplayStateChanges(MeeGo::QmDisplayState::Displ
++ 
++     bool changeInDimming = (state == MeeGo::QmDisplayState::Dimmed) != (m_currentDisplayState == MeeGo::QmDisplayState::Dimmed);
++ 
+++    bool changeInAmbient = ((state == MeeGo::QmDisplayState::Off) != (m_currentDisplayState == MeeGo::QmDisplayState::Off)) && ambientEnabled();
+++
+++    bool enterAmbient = changeInAmbient && (state == MeeGo::QmDisplayState::Off);
+++    bool leaveAmbient = changeInAmbient && (state != MeeGo::QmDisplayState::Off);
+++
++     m_currentDisplayState = state;
++ 
++     if (changeInDimming) {
++         emit displayDimmedChanged();
++     }
+++    if (changeInAmbient) {
+++        emit displayAmbientChanged();
+++    }
+++    if (enterAmbient) {
+++        emit displayAmbientEntered();
+++    }
+++    if (leaveAmbient) {
+++        emit displayAmbientLeft();
+++    }
++ }
++ 
++ void LipstickCompositor::setScreenOrientationFromSensor()
++@@ -702,8 +727,120 @@ void LipstickCompositor::clipboardDataChanged()
++         overrideSelection(const_cast<QMimeData *>(mimeData));
++ }
++ 
+++bool LipstickCompositor::ambientSupported() const
+++{
+++    qWarning() << "ambientSupported";
+++    void* ambientMode = QGuiApplication::platformNativeInterface()->nativeResourceForIntegration("AmbientSupported");
+++    if (ambientMode) {
+++        return true;
+++    }
+++    return false;
+++}
+++
+++void LipstickCompositor::setAmbientEnabled(bool enabled)
+++{
+++    if (!ambientSupported()) {
+++        return;
+++    }
+++
+++    if (m_ambientModeEnabled == enabled) {
+++        return;
+++    }
+++
+++    qWarning() << "setAmbientEnabled " << ambientSupported() << " " << enabled;
+++
+++    m_ambientModeEnabled = enabled;
+++    if (m_ambientModeEnabled) {
+++        QGuiApplication::platformNativeInterface()->nativeResourceForIntegration("AmbientEnable");
+++    } else {
+++        QGuiApplication::platformNativeInterface()->nativeResourceForIntegration("AmbientDisable");
+++    }
+++    emit ambientEnabledChanged();
+++}
+++
+++void LipstickCompositor::scheduleAmbientUpdate()
+++{
+++    if (!ambientEnabled()) {
+++        return;
+++    }
+++    QMap<QString,QVariant> match;
+++    match.insert("type", QVariant(QString("wakeup")));
+++    QDBusReply< QList<QVariant> > reply = m_timedDbus->query_sync(match);
+++
+++    if( !reply.isValid() ) {
+++        qWarning() << "'query' call failed:" << m_timedDbus->lastError();
+++        return;
+++    }
+++
+++    uint cookie = 0;
+++    // Remove everything but the last cookie.
+++    for (QList<QVariant>::ConstIterator iter = reply.value().constBegin(); iter != --reply.value().constEnd(); ++iter) {
+++        bool ok = true;
+++        cookie = iter->toUInt(&ok);
+++        if( !ok ) {
+++            cookie = 0;
+++            continue;
+++        }
+++
+++        QDBusReply<bool> res = m_timedDbus->cancel_sync(cookie);
+++
+++        if (!res.isValid()) {
+++            qWarning() << "'cancel' call failed:" << m_timedDbus->lastError();
+++        } else {
+++            qWarning() << "cookie " << cookie << " deleted " << res.value();
+++        }
+++    }
+++
+++    bool ok = true;
+++    cookie = reply.value().takeLast().toUInt(&ok);
+++    if( !ok ) {
+++        cookie = 0;
+++    }
+++
+++    //  ADD NEW WAKEUP EVENT!
+++    Maemo::Timed::Event wakeupEvent;
+++
+++    time_t currentTime;
+++    struct tm* timeinfo;
+++    time(&currentTime);
+++    timeinfo = localtime(&currentTime);
+++    // Over time the wakup time might drift. Avoid this by setting seconds always to zero.
+++    timeinfo->tm_sec = 0;
+++
+++    time_t wakeupTime = mktime(timeinfo);
+++    if (wakeupTime == -1) {
+++        wakeupTime = currentTime;
+++    }
+++    wakeupTime += 60;
+++    wakeupEvent.setTicker(wakeupTime);
+++    wakeupEvent.setAttribute(QLatin1String("APPLICATION"), QLatin1String("wakup_alarm"));
+++    wakeupEvent.setAttribute(QLatin1String("type"), QLatin1String("wakeup"));
+++    wakeupEvent.setBootFlag();
+++    wakeupEvent.setKeepAliveFlag();
+++    // Trigger the voland alarm/reminder dialog
+++    wakeupEvent.setReminderFlag();
+++    wakeupEvent.setAlarmFlag();
+++    wakeupEvent.setSingleShotFlag();
+++
+++    if (cookie) {
+++        QDBusReply<uint> res = m_timedDbus->replace_event_sync(wakeupEvent, cookie);
+++    } else {
+++        QDBusReply<uint> res = m_timedDbus->add_event_sync(wakeupEvent);
+++    }
+++}
+++
+++void LipstickCompositor::updateAmbientDisplay()
+++{
+++    qWarning() << "updateAmbientDisplay";
+++    if (m_currentDisplayState == MeeGo::QmDisplayState::On) return;
+++    setUpdatesEnabled(true);
+++    emit displayAmbientUpdate();
+++}
+++
++ void LipstickCompositor::setUpdatesEnabled(bool enabled)
++ {
+++    qWarning("LipstickCompositor::setUpdatesEnabled");
+++    qWarning() << "setUpdatesEnabled " << enabled;
++     if (m_updatesEnabled != enabled) {
++         m_updatesEnabled = enabled;
++         if (!m_updatesEnabled) {
++@@ -719,6 +856,8 @@ void LipstickCompositor::setUpdatesEnabled(bool enabled)
++             }
++             // trigger frame callbacks which are pending already at this time
++             surfaceCommitted();
+++
+++            scheduleAmbientUpdate();
++         } else {
++             if (m_window->handle()) {
++                 QGuiApplication::platformNativeInterface()->nativeResourceForIntegration("DisplayOn");
++diff --git a/src/compositor/lipstickcompositor.h b/src/compositor/lipstickcompositor.h
++index 7f25051b..9de3c841 100644
++--- a/src/compositor/lipstickcompositor.h
+++++ b/src/compositor/lipstickcompositor.h
++@@ -29,6 +29,10 @@
++ #include <MGConfItem>
++ #include <qmdisplaystate.h>
++ 
+++#include <timed-qt5/interface>
+++#include <timed-qt5/exception>
+++#include <timed-qt5/event-declarations.h>
+++
++ namespace QtWayland {
++     class SurfaceExtensionGlobal;
++     class ExtendedSurface;
++@@ -59,6 +63,9 @@ class LIPSTICK_EXPORT LipstickCompositor : public QWaylandQuickCompositor
++     Q_PROPERTY(bool displayDimmed READ displayDimmed NOTIFY displayDimmedChanged)
++     Q_PROPERTY(bool completed READ completed NOTIFY completedChanged)
++     Q_PROPERTY(QQuickWindow *quickWindow READ quickWindow CONSTANT)
+++    Q_PROPERTY(bool ambientSupported READ ambientSupported CONSTANT)
+++    Q_PROPERTY(bool ambientEnabled READ ambientEnabled WRITE setAmbientEnabled NOTIFY ambientEnabledChanged)
+++    Q_PROPERTY(bool displayAmbient READ displayAmbient NOTIFY displayAmbientChanged)
++ 
++ public:
++     LipstickCompositor();
++@@ -113,7 +120,14 @@ public:
++ 
++     bool completed();
++ 
++-    void setUpdatesEnabled(bool enabled);
+++    bool ambientSupported() const;
+++    void setAmbientEnabled(bool enabled);
+++    bool ambientEnabled() const { return m_ambientModeEnabled; }
+++    void scheduleAmbientUpdate();
+++    Q_INVOKABLE void updateAmbientDisplay();
+++
+++    bool displayAmbient() const { return (m_currentDisplayState == MeeGo::QmDisplayState::Off) && ambientEnabled(); }
+++    Q_INVOKABLE void setUpdatesEnabled(bool enabled);
++     LipstickCompositorWindow *createView(QWaylandSurface *surf);
++ 
++     QQuickWindow *quickWindow() { return m_window; }
++@@ -144,11 +158,20 @@ signals:
++     void orientationLockChanged();
++     void displayDimmedChanged();
++ 
+++    void displayAmbientEntered();
+++    void displayAmbientLeft();
+++    // Display entered/left ambient mode.
+++    void displayAmbientChanged();
+++    // Update the screen in ambient mode.
+++    void displayAmbientUpdate();
+++
++     void displayOn();
++     void displayOff();
++     void displayAboutToBeOn();
++     void displayAboutToBeOff();
++ 
+++    void ambientEnabledChanged();
+++
++     void completedChanged();
++ 
++     void showUnlockScreen();
++@@ -226,6 +249,10 @@ private:
++     QWaylandWlShell *m_wlShell;
++     QtWayland::SurfaceExtensionGlobal *m_surfExtGlob;
++     QWaylandQtWindowManager *m_wm;
+++
+++    Maemo::Timed::Interface *m_timedDbus;
+++
+++    bool m_ambientModeEnabled;
++ };
++ 
++ #endif // LIPSTICKCOMPOSITOR_H
++diff --git a/src/src.pro b/src/src.pro
++index 37a0657f..e88f1b90 100644
++--- a/src/src.pro
+++++ b/src/src.pro
++@@ -14,6 +14,8 @@ DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x000000
++ DEFINES += LIPSTICK_BUILD_LIBRARY
++ DEFINES += VERSION=\\\"$${VERSION}\\\"
++ 
+++PKGCONFIG += timed-qt5
+++
++ CONFIG += qt wayland-scanner
++ INSTALLS = target ts_install engineering_english_install
++ target.path = $$[QT_INSTALL_LIBS]
++-- 
++2.26.2
++
+diff --git a/recipes-nemomobile/lipstick/lipstick_git.bb b/recipes-nemomobile/lipstick/lipstick_git.bb
+index ce73292..8a7f345 100644
+--- a/recipes-nemomobile/lipstick/lipstick_git.bb
++++ b/recipes-nemomobile/lipstick/lipstick_git.bb
+@@ -9,6 +9,7 @@ SRC_URI = "git://github.com/AsteroidOS/lipstick.git;protocol=https \
+     file://0003-Disable-USB-mode-notifications-on-connect.patch \
+     file://0004-ScreenshotService-Use-system-bus-to-workaround-the-s.patch \
+     file://0005-BluetoothAgent-Advertise-less-hardware-capabilities-.patch \
++    file://0006-freeze-renderer-on-ambient-mode.patch \
+     file://Notifications/"
+ SRCREV = "${AUTOREV}"
+ PR = "r1"
+@@ -17,7 +18,7 @@ S = "${WORKDIR}/git"
+ 
+ PACKAGE_ARCH = "${MACHINE_ARCH}"
+ 
+-DEPENDS += "qtbase qtsensors qtdeclarative qtwayland mlite dbus dbus-glib libresourceqt qtsystems libngf-qt statefs-qt mce usb-moded-qt5 systemd wayland nemo-keepalive qttools-native"
++DEPENDS += "timed qtbase qtsensors qtdeclarative qtwayland mlite dbus dbus-glib libresourceqt qtsystems libngf-qt statefs-qt mce usb-moded-qt5 systemd wayland nemo-keepalive qttools-native"
+ RDEPENDS_${PN} += "${PN}-locale"
+ 
+ inherit qmake5
+diff --git a/recipes-nemomobile/mce/mce/0002-no-wakelock-lpm.patch b/recipes-nemomobile/mce/mce/0002-no-wakelock-lpm.patch
+new file mode 100644
+index 0000000..dc76beb
+--- /dev/null
++++ b/recipes-nemomobile/mce/mce/0002-no-wakelock-lpm.patch
+@@ -0,0 +1,218 @@
++From 1519e5f450d1272d26b7d243fcd3a8a775d8593a Mon Sep 17 00:00:00 2001
++From: MagneFire <IDaNLContact@gmail.com>
++Date: Fri, 15 May 2020 11:52:56 +0200
++Subject: [PATCH] WIP: ambient mode display.
++
++---
++ mce-dbus.h        |  1 +
++ mce-fbdev.c       |  4 +++-
++ modules/alarm.c   | 32 +++++++++++++++++++++++++++++++-
++ modules/display.c | 16 ++++++++++++----
++ modules/display.h |  8 ++++++++
++ 5 files changed, 55 insertions(+), 6 deletions(-)
++
++diff --git a/mce-dbus.h b/mce-dbus.h
++index 0750247..8e31882 100644
++--- a/mce-dbus.h
+++++ b/mce-dbus.h
++@@ -44,6 +44,7 @@
++ 
++ /* Enabling/disabling display updates via compositor service */
++ #define COMPOSITOR_SET_UPDATES_ENABLED "setUpdatesEnabled"
+++#define COMPOSITOR_UPDATE_AMBIENT_MODE_DISPLAY "updateAmbientDisplay"
++ 
++ /* ========================================================================= *
++  * LIPSTICK DBUS SERVICE
++diff --git a/mce-fbdev.c b/mce-fbdev.c
++index 519d061..ea34c26 100644
++--- a/mce-fbdev.c
+++++ b/mce-fbdev.c
++@@ -254,10 +254,12 @@ void mce_fbdev_linger_after_exit(int delay_ms)
++  */
++ void mce_fbdev_set_power(bool power_on)
++ {
+++    //power_on = true;
++     mce_log(LL_DEBUG, "fbdev power %s", power_on ? "up" : "down");
++ 
++     if( mce_fbdev_handle != -1 ) {
++-        int value = power_on ? FB_BLANK_UNBLANK : FB_BLANK_POWERDOWN;
+++        int value = power_on ? FB_BLANK_UNBLANK : FB_BLANK_VSYNC_SUSPEND;
+++        //int value = power_on ? FB_BLANK_UNBLANK : FB_BLANK_POWERDOWN;
++ 
++         if( ioctl(mce_fbdev_handle, FBIOBLANK, value) == -1 )
++             mce_log(LL_ERR, "%s: ioctl(FBIOBLANK,%d): %m", FB_DEVICE, value);
++diff --git a/modules/alarm.c b/modules/alarm.c
++index 442ea59..c24134a 100644
++--- a/modules/alarm.c
+++++ b/modules/alarm.c
++@@ -23,7 +23,9 @@
++ #include "../mce-log.h"
++ #include "../mce-dbus.h"
++ #include "../mce-wakelock.h"
+++#include "../mce-dbus.h"
++ 
+++# define COMPOSITOR_STM_DBUS_CALL_TIMEOUT DBUS_TIMEOUT_INFINITE
++ #include <gmodule.h>
++ 
++ /* Alarm UI related D-Bus constants */
++@@ -43,6 +45,7 @@ typedef enum {
++ #define TIMED_DBUS_OBJECT               "/com/nokia/time"
++ #define TIMED_DBUS_INTERFACE            "com.nokia.time"
++ #define TIMED_QUEUE_STATUS_SIG          "next_bootup_event"
+++#define TIMED_WAKEUP_EVENT              "wakeup_event"
++ 
++ /** Module name */
++ #define MODULE_NAME                     "alarm"
++@@ -91,6 +94,7 @@ static void     queue_monitor_setup         (const char *sender, bool monitor);
++ 
++ static gboolean alarm_dialog_status_dbus_cb (DBusMessage *const msg);
++ static gboolean alarm_queue_status_dbus_cb  (DBusMessage *const sig);
+++static gboolean alarm_wakeup_dbus_cb  (DBusMessage *const sig);
++ 
++ static void     mce_alarm_init_dbus         (void);
++ static void     mce_alarm_quit_dbus         (void);
++@@ -337,12 +341,32 @@ static gboolean alarm_queue_status_dbus_cb(DBusMessage *const sig)
++          * and alarm ui will be started up.
++          */
++         queue_monitor_setup(sender, bootup == 1 || normal == 1);
++-
++ EXIT:
++         dbus_error_free(&error);
++         return TRUE;
++ }
++ 
+++
+++static gboolean alarm_wakeup_dbus_cb(DBusMessage *const sig)
+++{
+++    // System booted from sleep, providing ambient update if display is in ambient mode!
+++    // Maybe schedule next wakup event?
+++    mce_log(LL_DEVEL, "WAKE EVENT!, update screen!");
+++    mce_log(LL_NOTICE, "call %s()",
+++            COMPOSITOR_UPDATE_AMBIENT_MODE_DISPLAY);
+++
+++    // XXX we want to use longer than default timeout here!
+++    bool ack = dbus_send_ex2(COMPOSITOR_SERVICE,
+++                             COMPOSITOR_PATH,
+++                             COMPOSITOR_IFACE,
+++                             COMPOSITOR_UPDATE_AMBIENT_MODE_DISPLAY,
+++                             NULL,
+++                             COMPOSITOR_STM_DBUS_CALL_TIMEOUT,
+++                             NULL, 0,
+++                             NULL,
+++                             DBUS_TYPE_INVALID);
+++}
+++
++ /** Array of dbus message handlers */
++ static mce_dbus_handler_t alarm_dbus_handlers[] =
++ {
++@@ -359,6 +383,12 @@ static mce_dbus_handler_t alarm_dbus_handlers[] =
++         .type      = DBUS_MESSAGE_TYPE_SIGNAL,
++         .callback  = alarm_queue_status_dbus_cb,
++     },
+++    {
+++        .interface = TIMED_DBUS_INTERFACE,
+++        .name      = TIMED_WAKEUP_EVENT,
+++        .type      = DBUS_MESSAGE_TYPE_SIGNAL,
+++        .callback  = alarm_wakeup_dbus_cb,
+++    },
++     /* sentinel */
++     {
++         .interface = 0
++diff --git a/modules/display.c b/modules/display.c
++index 1443d53..2fe611a 100644
++--- a/modules/display.c
+++++ b/modules/display.c
++@@ -2428,6 +2428,8 @@ static void mdy_brightness_set_level(int number)
++     int minval = 0;
++     int maxval = mdy_brightness_level_maximum;
++ 
+++    // WARNING: GET RID OF THIS LINE!!!!
+++    //if (number < 60) number = 60;
++     /* If we manage to get out of hw bounds values from depths
++      * of pipelines and state machines we could end up with
++      * black screen without easy way out -> clip to valid range */
++@@ -2536,6 +2538,7 @@ static void mdy_brightness_force_level(int number)
++     mdy_brightness_fade_start_time =
++         mdy_brightness_fade_end_time = mce_lib_get_boot_tick();
++ 
+++    mce_log(LL_DEBUG, "mdy_brightness_force_level %d", number);
++     mdy_brightness_set_level(number);
++ }
++ 
++@@ -2631,6 +2634,7 @@ static gboolean mdy_brightness_fade_timer_cb(gpointer data)
++         keep_going = TRUE;
++     }
++ 
+++    mce_log(LL_DEBUG, "mdy_brightness_fade_timer_cb %d", lev);
++     mdy_brightness_set_level(lev);
++ 
++     /* Cleanup if finished */
++@@ -2914,7 +2918,9 @@ static void mdy_brightness_set_fade_target_blank(void)
++          * Thus it must not be used during active call to avoid stray
++          * touch input from ear/chin when proximity blanking is in use.
++          */
++-        mdy_brightness_force_level(0);
+++        mce_log(LL_DEBUG, "mdy_brightness_set_fade_target_blank");
+++        //AHDKHSKDHAKWHDAKWJHKJWH
+++        //mdy_brightness_force_level(0);
++         goto EXIT;
++     }
++ 
++@@ -3799,6 +3805,7 @@ static void mdy_blanking_schedule_off(void)
++         mce_log(LL_DEBUG, "BLANK timer rescheduled @ %d secs", timeout);
++     }
++     else {
+++        //wakelock_unlock("mce_lpm_off");
++         wakelock_lock("mce_lpm_off", -1);
++         mce_log(LL_DEBUG, "BLANK timer scheduled @ %d secs", timeout);
++     }
++@@ -6268,7 +6275,7 @@ compositor_stm_set_target(compositor_stm_t *self, renderer_state_t state)
++         mce_log(LL_DEBUG, "compositor_stm_target: %s -> %s",
++                 renderer_state_repr(self->csi_target),
++                 renderer_state_repr(state));
++-        self->csi_target = state;
+++        self->csi_target = state; // DISABLES COMPOSITOR!!!!!!!!!!!!!!!!!!!!!!
++     }
++ }
++ 
++@@ -6800,7 +6807,8 @@ static void mdy_display_state_changed(void)
++     case MCE_DISPLAY_OFF:
++     case MCE_DISPLAY_LPM_OFF:
++         /* Blanking or already blanked -> set zero brightness */
++-        mdy_brightness_force_level(0);
+++        //AHDKWHKWAHKJHDKD
+++        //mdy_brightness_force_level(0);
++         break;
++ 
++     case MCE_DISPLAY_LPM_ON:
++@@ -6923,7 +6931,7 @@ static void mdy_display_state_leave(display_state_t prev_state,
++     case MCE_DISPLAY_OFF:
++     case MCE_DISPLAY_LPM_OFF:
++         mdy_brightness_level_display_resume = 0;
++-        mdy_brightness_set_fade_target_blank();
+++        //mdy_brightness_set_fade_target_blank();
++         break;
++ 
++     case MCE_DISPLAY_UNDEF:
++diff --git a/modules/display.h b/modules/display.h
++index e155385..9df76c1 100644
++--- a/modules/display.h
+++++ b/modules/display.h
++@@ -397,6 +397,14 @@
++ # define MCE_SETTING_DISPLAY_NEVER_BLANK                 MCE_SETTING_DISPLAY_PATH "/display_never_blank"
++ # define MCE_DEFAULT_DISPLAY_NEVER_BLANK                 0
++ 
+++/* ------------------------------------------------------------------------- *
+++ * Ambient Mode Display settings
+++ * ------------------------------------------------------------------------- */
+++
+++/** Whether the wrist gesture sensor is available on the hardware */
+++# define MCE_SETTING_AMBIENT_MODE_AVAILABLE              MCE_SETTING_DISPLAY_PATH "/ambient_mode_available"
+++# define MCE_DEFAULT_AMBIENT_MODE_AVAILABLE              1
+++
++ /** Inhibit type */
++ typedef enum {
++     /** Inhibit value invalid */
++-- 
++2.26.2
++
+diff --git a/recipes-nemomobile/mce/mce/mce.service b/recipes-nemomobile/mce/mce/mce.service
+index d771f77..4e6b8b3 100644
+--- a/recipes-nemomobile/mce/mce/mce.service
++++ b/recipes-nemomobile/mce/mce/mce.service
+@@ -9,7 +9,7 @@ Conflicts=shutdown.target
+ [Service]
+ Type=notify
+ Environment=DSME_SOCKFILE=/run/dsme.socket
+-ExecStart=/usr/sbin/mce --systemd
++ExecStart=/usr/sbin/mce --systemd -vvvvvvvvvvvvvvv
+ TimeoutSec=2
+ Restart=always
+ 
+diff --git a/recipes-nemomobile/mce/mce_git.bb b/recipes-nemomobile/mce/mce_git.bb
+index c3be96c..517084a 100644
+--- a/recipes-nemomobile/mce/mce_git.bb
++++ b/recipes-nemomobile/mce/mce_git.bb
+@@ -4,6 +4,7 @@ LICENSE = "LGPL-2.1+"
+ LIC_FILES_CHKSUM = "file://COPYING;md5=4fbd65380cdd255951079008b364516c"
+ 
+ SRC_URI = "git://github.com/AsteroidOS/mce.git;protocol=https \
++    file://0002-no-wakelock-lpm.patch \
+     file://mce.service"
+ SRC_URI_append_qemux86 = " file://0001-Keep-screen-on-by-default-on-emulator.patch"
+ SRCREV = "${AUTOREV}"
+diff --git a/recipes-nemomobile/timed/timed/0002-more-logging.patch b/recipes-nemomobile/timed/timed/0002-more-logging.patch
+new file mode 100644
+index 0000000..fa95d43
+--- /dev/null
++++ b/recipes-nemomobile/timed/timed/0002-more-logging.patch
+@@ -0,0 +1,13 @@
++diff --git a/src/common/log.h b/src/common/log.h
++index c238d2c..5a50619 100644
++--- a/src/common/log.h
+++++ b/src/common/log.h
++@@ -36,7 +36,7 @@
++ #define LOG_DEBUG    7
++ #define LOG_FULL     LOG_DEBUG
++ 
++-#define LOG_LEVEL LOG_WARNING
+++#define LOG_LEVEL LOG_FULL
++ 
++ #if LOG_LEVEL >= LOG_DEBUG
++ # define log_debug(FMT,ARGS...) \
+diff --git a/recipes-nemomobile/timed/timed/0003-no-voland.patch b/recipes-nemomobile/timed/timed/0003-no-voland.patch
+new file mode 100644
+index 0000000..c1fe590
+--- /dev/null
++++ b/recipes-nemomobile/timed/timed/0003-no-voland.patch
+@@ -0,0 +1,100 @@
++diff --git a/src/server/adaptor.h b/src/server/adaptor.h
++index 7c28921..f7a6491 100644
++--- a/src/server/adaptor.h
+++++ b/src/server/adaptor.h
++@@ -80,6 +80,7 @@ signals:
++   void settings_changed_1(bool) ;
++   void next_bootup_event(int next_boot_event, int next_non_boot_event);
++   void alarm_triggers_changed(Maemo::Timed::Event::Triggers);
+++  void wakeup_event();
++ 
++ public slots:
++ 
++diff --git a/src/server/machine.cpp b/src/server/machine.cpp
++index 6977fb0..dee03cf 100644
++--- a/src/server/machine.cpp
+++++ b/src/server/machine.cpp
++@@ -116,6 +116,7 @@ machine_t::machine_t(const Timed *daemon) : timed(daemon)
++   state_armed->open() ;
++ 
++   QObject::connect(state_dlg_wait, SIGNAL(voland_needed()), this, SIGNAL(voland_needed())) ;
+++  QObject::connect(state_dlg_wait, SIGNAL(wakeup_event()), this, SIGNAL(wakeup_event())) ;
++ 
++   QObject::connect(state_dlg_wait, SIGNAL(closed()), state_dlg_requ, SLOT(open())) ;
++   QObject::connect(state_dlg_wait, SIGNAL(closed()), state_dlg_user, SLOT(open())) ;
++diff --git a/src/server/machine.h b/src/server/machine.h
++index de0098f..314aba7 100644
++--- a/src/server/machine.h
+++++ b/src/server/machine.h
++@@ -101,6 +101,7 @@ Q_SIGNALS:
++   void queue_to_be_saved() ;
++   void voland_needed() ;
++   void next_bootup_event(int, int);
+++  void wakeup_event();
++   void child_created(unsigned, int) ;
++   void alarm_present(bool present);
++   void alarm_trigger(QMap<QString, QVariant> triggers);
++diff --git a/src/server/state.cpp b/src/server/state.cpp
++index 02a7d74..7f183ed 100644
++--- a/src/server/state.cpp
+++++ b/src/server/state.cpp
++@@ -738,8 +738,21 @@ void state_aborted_t::enter(event_t *e)
++ void state_dlg_wait_t::enter(event_t *e)
++ {
++   e->flags |= EventFlags::In_Dialog ;
++-  if (not is_open)
++-    emit voland_needed() ;
+++  for(attribute_t::const_iterator at=e->attr.txt.begin(); at!=e->attr.txt.end(); at++)
+++  {
+++    QString key = string_std_to_q(at->first) ;
+++    QString val = string_std_to_q(at->second) ;
+++    if (key == "type") {
+++      if (val == "wakeup") {
+++        emit wakeup_event();
+++      } else {
+++        emit wakeup_event();
+++        //if (not is_open)
+++        //  emit voland_needed();
+++      }
+++      break;
+++    }
+++  }
++   abstract_gate_state_t::enter(e) ;
++ }
++ 
++diff --git a/src/server/state.h b/src/server/state.h
++index 92046e5..0e84ccb 100644
++--- a/src/server/state.h
+++++ b/src/server/state.h
++@@ -314,6 +314,7 @@ public:
++   uint32_t cluster_bits() { return EventFlags::Cluster_Dialog ; }
++ Q_SIGNALS:
++   void voland_needed() ;
+++  void wakeup_event();
++ private:
++   Q_OBJECT ;
++ } ;
++diff --git a/src/server/timed.cpp b/src/server/timed.cpp
++index 1d1179a..aa386d0 100644
++--- a/src/server/timed.cpp
+++++ b/src/server/timed.cpp
++@@ -316,6 +316,7 @@ void Timed::init_create_event_machine()
++ 
++   // Forward signal from am to DBUS via com_nokia_time DBUS adaptor
++   QObject::connect(am, SIGNAL(next_bootup_event(int,int)), this, SIGNAL(next_bootup_event(int,int)));
+++  QObject::connect(am, SIGNAL(wakeup_event()), this, SIGNAL(wakeup_event()));
++   voland_watcher = NULL ;
++   QObject::connect(this, SIGNAL(voland_registered()), am, SIGNAL(voland_registered())) ;
++   QObject::connect(this, SIGNAL(voland_unregistered()), am, SIGNAL(voland_unregistered())) ;
++diff --git a/src/server/timed.h b/src/server/timed.h
++index e7cb2a7..2bdd62b 100644
++--- a/src/server/timed.h
+++++ b/src/server/timed.h
++@@ -165,6 +165,7 @@ Q_SIGNALS:
++   void settings_changed(const Maemo::Timed::WallClock::Info &, bool system_time) ;
++   void next_bootup_event(int next_boot_event, int next_non_boot_event);
++   void alarm_triggers_changed(Maemo::Timed::Event::Triggers);
+++  void wakeup_event();
++   // void settings_changed_1(bool system_time) ;
++ public:
++   Timed(int ac, char **av) ;
+diff --git a/recipes-nemomobile/timed/timed_git.bb b/recipes-nemomobile/timed/timed_git.bb
+index 1abb3af..04e063b 100644
+--- a/recipes-nemomobile/timed/timed_git.bb
++++ b/recipes-nemomobile/timed/timed_git.bb
+@@ -3,8 +3,10 @@ HOMEPAGE = "https://git.merproject.org/mer-core/timed"
+ LICENSE = "LGPL-2.1+"
+ LIC_FILES_CHKSUM = "file://COPYING;md5=4fbd65380cdd255951079008b364516c"
+ 
++#file://0002-more-logging.patch 
+ SRC_URI = "git://git.merproject.org/mer-core/timed.git;protocol=https \
+     file://0001-Fixes-build.patch \
++    file://0003-no-voland.patch \
+     file://timed-qt5.conf \
+     file://timed-qt5.service"
+ SRCREV = "c7c1380fcc72390d59f1dc3e01b0cff29207f293"
+diff --git a/recipes-qt/packagegroups/packagegroup-qt5-toolchain-target.bbappend b/recipes-qt/packagegroups/packagegroup-qt5-toolchain-target.bbappend
+index 63d6480..ff937d0 100644
+--- a/recipes-qt/packagegroups/packagegroup-qt5-toolchain-target.bbappend
++++ b/recipes-qt/packagegroups/packagegroup-qt5-toolchain-target.bbappend
+@@ -31,3 +31,5 @@ RDEPENDS_${PN} += "qtmpris-dev"
+ 
+ RDEPENDS_${PN} += "mapplauncherd-qt"
+ RDEPENDS_${PN} += "qml-asteroid-dev"
++
++RDEPENDS_${PN} += "libsdl2-dev"
+diff --git a/recipes-qt/qt5/qt5-qpa-hwcomposer-plugin/0006-WIP-ambient-mode-display.patch b/recipes-qt/qt5/qt5-qpa-hwcomposer-plugin/0006-WIP-ambient-mode-display.patch
+new file mode 100644
+index 0000000..c933066
+--- /dev/null
++++ b/recipes-qt/qt5/qt5-qpa-hwcomposer-plugin/0006-WIP-ambient-mode-display.patch
+@@ -0,0 +1,159 @@
++From bdbf4ce8907d5575cf2ac918d1c6ec2625665b5c Mon Sep 17 00:00:00 2001
++From: MagneFire <IDaNLContact@gmail.com>
++Date: Thu, 14 May 2020 12:33:25 +0200
++Subject: [PATCH] WIP: ambient mode display.
++
++---
++ hwcomposer/hwcomposer_backend.h       |  2 ++
++ hwcomposer/hwcomposer_backend_v11.cpp | 34 +++++++++++++++++++++++++--
++ hwcomposer/hwcomposer_backend_v11.h   |  3 +++
++ hwcomposer/hwcomposer_context.cpp     | 11 +++++++++
++ hwcomposer/hwcomposer_context.h       |  2 ++
++ hwcomposer/qeglfsintegration.cpp      |  6 +++++
++ 6 files changed, 56 insertions(+), 2 deletions(-)
++
++diff --git a/hwcomposer/hwcomposer_backend.h b/hwcomposer/hwcomposer_backend.h
++index 5c579aa..fffc3d8 100644
++--- a/hwcomposer/hwcomposer_backend.h
+++++ b/hwcomposer/hwcomposer_backend.h
++@@ -106,6 +106,8 @@ public:
++     virtual EGLNativeWindowType createWindow(int width, int height) = 0;
++     virtual void destroyWindow(EGLNativeWindowType window) = 0;
++     virtual void swap(EGLNativeDisplayType display, EGLSurface surface) = 0;
+++    virtual bool ambientModeSupport() {return false;}
+++    virtual void ambientModeEnabled(bool enable) {Q_UNUSED(enable);}
++     virtual void sleepDisplay(bool sleep) = 0;
++     virtual float refreshRate() = 0;
++ 
++diff --git a/hwcomposer/hwcomposer_backend_v11.cpp b/hwcomposer/hwcomposer_backend_v11.cpp
++index 933fa17..da6f2b1 100644
++--- a/hwcomposer/hwcomposer_backend_v11.cpp
+++++ b/hwcomposer/hwcomposer_backend_v11.cpp
++@@ -320,6 +320,28 @@ HwComposerBackend_v11::swap(EGLNativeDisplayType display, EGLSurface surface)
++ #endif
++ }
++ 
+++bool HwComposerBackend_v11::ambientModeSupport()
+++{
+++    qDebug() << "HwComposerBackend_v11::ambientModeSupport" << hwc_version;
+++#ifdef HWC_DEVICE_API_VERSION_1_4
+++        if (hwc_version == HWC_DEVICE_API_VERSION_1_4) {
+++            return true;
+++        } else
+++#endif
+++#ifdef HWC_DEVICE_API_VERSION_1_5
+++        if (hwc_version == HWC_DEVICE_API_VERSION_1_5) {
+++            return true;
+++        } else
+++#endif
+++            return false;
+++}
+++
+++void HwComposerBackend_v11::ambientModeEnabled(bool enable)
+++{
+++    if (ambientModeSupport()) {
+++        m_ambientMode = enable;
+++    }
+++}
++ void
++ HwComposerBackend_v11::sleepDisplay(bool sleep)
++ {
++@@ -333,12 +355,20 @@ HwComposerBackend_v11::sleepDisplay(bool sleep)
++ 
++ #ifdef HWC_DEVICE_API_VERSION_1_4
++         if (hwc_version == HWC_DEVICE_API_VERSION_1_4) {
++-            HWC_PLUGIN_EXPECT_ZERO(hwc_device->setPowerMode(hwc_device, 0, HWC_POWER_MODE_OFF));
+++            if (m_ambientMode) {
+++                HWC_PLUGIN_EXPECT_ZERO(hwc_device->setPowerMode(hwc_device, 0, HWC_POWER_MODE_DOZE_SUSPEND));
+++            } else {
+++                HWC_PLUGIN_EXPECT_ZERO(hwc_device->setPowerMode(hwc_device, 0, HWC_POWER_MODE_OFF));
+++            }
++         } else
++ #endif
++ #ifdef HWC_DEVICE_API_VERSION_1_5
++         if (hwc_version == HWC_DEVICE_API_VERSION_1_5) {
++-            HWC_PLUGIN_EXPECT_ZERO(hwc_device->setPowerMode(hwc_device, 0, HWC_POWER_MODE_OFF));
+++            if (m_ambientMode) {
+++                HWC_PLUGIN_EXPECT_ZERO(hwc_device->setPowerMode(hwc_device, 0, HWC_POWER_MODE_DOZE_SUSPEND));
+++            } else {
+++                HWC_PLUGIN_EXPECT_ZERO(hwc_device->setPowerMode(hwc_device, 0, HWC_POWER_MODE_OFF));
+++            }
++         } else
++ #endif
++             HWC_PLUGIN_EXPECT_ZERO(hwc_device->blank(hwc_device, 0, 1));
++diff --git a/hwcomposer/hwcomposer_backend_v11.h b/hwcomposer/hwcomposer_backend_v11.h
++index 98561de..9a623de 100644
++--- a/hwcomposer/hwcomposer_backend_v11.h
+++++ b/hwcomposer/hwcomposer_backend_v11.h
++@@ -63,6 +63,8 @@ public:
++     virtual EGLNativeWindowType createWindow(int width, int height);
++     virtual void destroyWindow(EGLNativeWindowType window);
++     virtual void swap(EGLNativeDisplayType display, EGLSurface surface);
+++    virtual bool ambientModeSupport() Q_DECL_OVERRIDE;
+++    virtual void ambientModeEnabled(bool enable) Q_DECL_OVERRIDE;
++     virtual void sleepDisplay(bool sleep);
++     virtual float refreshRate();
++ 
++@@ -79,6 +81,7 @@ private:
++     uint32_t hwc_version;
++     int num_displays;
++ 
+++    bool m_ambientMode;
++     bool m_displayOff;
++     QBasicTimer m_deliverUpdateTimeout;
++     QBasicTimer m_vsyncTimeout;
++diff --git a/hwcomposer/hwcomposer_context.cpp b/hwcomposer/hwcomposer_context.cpp
++index 15ce986..98b80a4 100644
++--- a/hwcomposer/hwcomposer_context.cpp
+++++ b/hwcomposer/hwcomposer_context.cpp
++@@ -170,6 +170,17 @@ void HwComposerContext::swapToWindow(QEglFSContext *context, QPlatformSurface *s
++     EGLSurface egl_surface = context->eglSurfaceForPlatformSurface(surface);
++     return backend->swap(egl_display, egl_surface);
++ }
+++bool HwComposerContext::ambientModeSupport()
+++{
+++    return backend->ambientModeSupport();
+++}
+++
+++void HwComposerContext::ambientModeEnabled(bool enable)
+++{
+++    if (!ambientModeSupport()) return;
+++
+++    backend->ambientModeEnabled(enable);
+++}
++ 
++ void HwComposerContext::sleepDisplay(bool sleep)
++ {
++diff --git a/hwcomposer/hwcomposer_context.h b/hwcomposer/hwcomposer_context.h
++index 1d78a2c..04960c9 100644
++--- a/hwcomposer/hwcomposer_context.h
+++++ b/hwcomposer/hwcomposer_context.h
++@@ -79,6 +79,8 @@ public:
++ 
++     void swapToWindow(QEglFSContext *context, QPlatformSurface *surface);
++ 
+++    bool ambientModeSupport();
+++    void ambientModeEnabled(bool enable);
++     void sleepDisplay(bool sleep);
++     qreal refreshRate() const;
++ 
++diff --git a/hwcomposer/qeglfsintegration.cpp b/hwcomposer/qeglfsintegration.cpp
++index 112bfd8..811a217 100644
++--- a/hwcomposer/qeglfsintegration.cpp
+++++ b/hwcomposer/qeglfsintegration.cpp
++@@ -195,6 +195,12 @@ void *QEglFSIntegration::nativeResourceForIntegration(const QByteArray &resource
++ 
++     if (lowerCaseResource == "egldisplay") {
++         return static_cast<QEglFSScreen *>(mScreen)->display();
+++    } else if (lowerCaseResource == "ambientsupported") {
+++        return reinterpret_cast<void *>(mHwc->ambientModeSupport());
+++    } else if (lowerCaseResource == "ambientenable") {
+++        mHwc->ambientModeEnabled(true);
+++    } else if (lowerCaseResource == "ambientdisable") {
+++        mHwc->ambientModeEnabled(false);
++     } else if (lowerCaseResource == "displayoff") {
++         // Called from lipstick to turn off the display (src/homeapplication.cpp)
++         mHwc->sleepDisplay(true);
++-- 
++2.26.2
++
+diff --git a/recipes-qt/qt5/qt5-qpa-hwcomposer-plugin/0006-ambient-display.patch b/recipes-qt/qt5/qt5-qpa-hwcomposer-plugin/0006-ambient-display.patch
+new file mode 100644
+index 0000000..de0a7f7
+--- /dev/null
++++ b/recipes-qt/qt5/qt5-qpa-hwcomposer-plugin/0006-ambient-display.patch
+@@ -0,0 +1,19 @@
++diff --git a/hwcomposer/hwcomposer_backend_v11.cpp b/hwcomposer/hwcomposer_backend_v11.cpp
++index 933fa17..f78c3f9 100644
++--- a/hwcomposer/hwcomposer_backend_v11.cpp
+++++ b/hwcomposer/hwcomposer_backend_v11.cpp
++@@ -333,12 +333,12 @@ HwComposerBackend_v11::sleepDisplay(bool sleep)
++ 
++ #ifdef HWC_DEVICE_API_VERSION_1_4
++         if (hwc_version == HWC_DEVICE_API_VERSION_1_4) {
++-            HWC_PLUGIN_EXPECT_ZERO(hwc_device->setPowerMode(hwc_device, 0, HWC_POWER_MODE_OFF));
+++            HWC_PLUGIN_EXPECT_ZERO(hwc_device->setPowerMode(hwc_device, 0, HWC_POWER_MODE_DOZE_SUSPEND));
++         } else
++ #endif
++ #ifdef HWC_DEVICE_API_VERSION_1_5
++         if (hwc_version == HWC_DEVICE_API_VERSION_1_5) {
++-            HWC_PLUGIN_EXPECT_ZERO(hwc_device->setPowerMode(hwc_device, 0, HWC_POWER_MODE_OFF));
+++            HWC_PLUGIN_EXPECT_ZERO(hwc_device->setPowerMode(hwc_device, 0, HWC_POWER_MODE_DOZE_SUSPEND));
++         } else
++ #endif
++             HWC_PLUGIN_EXPECT_ZERO(hwc_device->blank(hwc_device, 0, 1));
+diff --git a/recipes-qt/qt5/qt5-qpa-hwcomposer-plugin_git.bb b/recipes-qt/qt5/qt5-qpa-hwcomposer-plugin_git.bb
+index a04c6d0..d6ce8e8 100644
+--- a/recipes-qt/qt5/qt5-qpa-hwcomposer-plugin_git.bb
++++ b/recipes-qt/qt5/qt5-qpa-hwcomposer-plugin_git.bb
+@@ -15,7 +15,9 @@ PACKAGE_ARCH = "${MACHINE_ARCH}"
+ 
+ SRC_URI = "git://github.com/mer-hybris/qt5-qpa-hwcomposer-plugin;protocol=https \
+            file://0003-Fix-build-with-Qt-5.9.patch;striplevel=2 \
+-           file://0005-hwcomposer_backend_v11-fix-compatibility-with-qtbase.patch;striplevel=2"
++           file://0005-hwcomposer_backend_v11-fix-compatibility-with-qtbase.patch;striplevel=2 \
++           file://0006-WIP-ambient-mode-display.patch;striplevel=2 \
++"
+ S = "${WORKDIR}/git/hwcomposer"
+ SRCREV = "bb95d09b893761c25409363e15f7048739c436ba"
+ 
+diff --git a/recipes-qt/qt5/qtwayland/0003-Client-Crash-instead-of-exit-when-there-s-a-wayland-.patch b/recipes-qt/qt5/qtwayland/0003-Client-Crash-instead-of-exit-when-there-s-a-wayland-.patch
+new file mode 100644
+index 0000000..170cd9a
+--- /dev/null
++++ b/recipes-qt/qt5/qtwayland/0003-Client-Crash-instead-of-exit-when-there-s-a-wayland-.patch
+@@ -0,0 +1,75 @@
++From f5a28afe4c2cb82540c94616e7a9e3e72e0e8327 Mon Sep 17 00:00:00 2001
++From: Johan Klokkhammer Helsing <johan.helsing@qt.io>
++Date: Tue, 20 Aug 2019 13:38:12 +0200
++Subject: [PATCH] Client: Crash instead of exit when there's a wayland error
++
++Qt applications should not call exit.
++
++Task-number: QTBUG-75779
++Change-Id: I91190b10f8c8e111996cd73283061e6ceaa6b1f6
++Reviewed-by: Pier Luigi Fiorini <pierluigi.fiorini@liri.io>
++---
++ src/client/qwaylanddisplay.cpp | 22 ++++++----------------
++ src/client/qwaylanddisplay_p.h |  1 -
++ 2 files changed, 6 insertions(+), 17 deletions(-)
++
++diff --git a/src/client/qwaylanddisplay.cpp b/src/client/qwaylanddisplay.cpp
++index 82003a30..47b107e8 100644
++--- a/src/client/qwaylanddisplay.cpp
+++++ b/src/client/qwaylanddisplay.cpp
++@@ -172,9 +172,9 @@ void QWaylandDisplay::checkError() const
++     int ecode = wl_display_get_error(mDisplay);
++     if ((ecode == EPIPE || ecode == ECONNRESET)) {
++         // special case this to provide a nicer error
++-        qWarning("The Wayland connection broke. Did the Wayland compositor die?");
+++        qFatal("The Wayland connection broke. Did the Wayland compositor die?");
++     } else {
++-        qErrnoWarning(ecode, "The Wayland connection experienced a fatal error");
+++        qFatal("The Wayland connection experienced a fatal error: %s", strerror(ecode));
++     }
++ }
++ 
++@@ -183,26 +183,16 @@ void QWaylandDisplay::flushRequests()
++         wl_display_read_events(mDisplay);
++     }
++ 
++-    if (wl_display_dispatch_pending(mDisplay) < 0) {
+++    if (wl_display_dispatch_pending(mDisplay) < 0)
++         checkError();
++-        exitWithError();
++-    }
++-
++     wl_display_flush(mDisplay);
++ }
++ 
++ 
++ void QWaylandDisplay::blockingReadEvents()
++ {
++-    if (wl_display_dispatch(mDisplay) < 0) {
+++    if (wl_display_dispatch(mDisplay) < 0)
++         checkError();
++-        exitWithError();
++-    }
++-}
++-
++-void QWaylandDisplay::exitWithError()
++-{
++-    ::exit(1);
++ }
++ 
++ QWaylandScreen *QWaylandDisplay::screenForOutput(struct wl_output *output) const
++diff --git a/src/client/qwaylanddisplay_p.h b/src/client/qwaylanddisplay_p.h
++index 6bf6abd5..ae8ec0ab 100644
++--- a/src/client/qwaylanddisplay_p.h
+++++ b/src/client/qwaylanddisplay_p.h
++@@ -191,7 +191,6 @@ public slots:
++ 
++ private:
++     void waitForScreens();
++-    void exitWithError();
++     void checkError() const;
++ 
++     void handleWaylandSync();
++-- 
++2.26.1
++
+diff --git a/recipes-qt/qt5/qtwayland_git.bbappend b/recipes-qt/qt5/qtwayland_git.bbappend
+index 57c8ea4..8ee1e5d 100644
+--- a/recipes-qt/qt5/qtwayland_git.bbappend
++++ b/recipes-qt/qt5/qtwayland_git.bbappend
+@@ -1,5 +1,7 @@
+ FILESEXTRAPATHS_prepend := "${THISDIR}/qtwayland:"
+ SRC_URI += " file://0001-Forces-GLES2-the-dirty-way.patch \
+-             file://0002-Revert-most-of-Remove-QWaylandExtendedSurface-from-t.patch"
++             file://0002-Revert-most-of-Remove-QWaylandExtendedSurface-from-t.patch \
++             file://0003-Client-Crash-instead-of-exit-when-there-s-a-wayland-.patch \
++"
+ 
+ DEPENDS_remove = "${XKB_DEPENDS}"

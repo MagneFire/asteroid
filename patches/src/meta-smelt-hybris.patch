@@ -1,9 +1,9 @@
-diff --git a/conf/machine/sturgeon.conf b/conf/machine/sturgeon.conf
+diff --git a/conf/machine/smelt.conf b/conf/machine/smelt.conf
 index a4c4d21..3882ede 100644
---- a/conf/machine/sturgeon.conf
-+++ b/conf/machine/sturgeon.conf
+--- a/conf/machine/smelt.conf
++++ b/conf/machine/smelt.conf
 @@ -16,4 +16,4 @@ PREFERRED_VERSION_android = "marshmallow"
- PREFERRED_PROVIDER_virtual/kernel = "linux-sturgeon"
+ PREFERRED_PROVIDER_virtual/kernel = "linux-smelt"
  PREFERRED_VERSION_linux = "3.10+marshmallow"
  
 -IMAGE_INSTALL += "msm-fb-refresher brcm-patchram-plus iproute2 wpa-supplicant underclock asteroid-hrm"
