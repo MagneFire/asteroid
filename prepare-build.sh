@@ -91,6 +91,7 @@ else
     clone_dir src/meta-wren-hybris     https://github.com/AsteroidOS/meta-wren-hybris        master
     clone_dir src/meta-asteroid        https://github.com/AsteroidOS/meta-asteroid            master
     clone_dir src/meta-sturgeon-hybris https://github.com/MagneFire/meta-sturgeon-hybris     master
+    clone_dir src/meta-sawshark-hybris https://github.com/MagneFire/meta-sawshark-hybris     master
     clone_dir src/meta-smelt-hybris    https://github.com/MagneFire/meta-smelt-hybris        master
     clone_dir src/meta-games           https://github.com/MagneFire/meta-games               master
 
@@ -126,6 +127,7 @@ BBLAYERS = " \
   ${SRCDIR}/meta-lenok-hybris \
   ${SRCDIR}/meta-smelt-hybris \
   ${SRCDIR}/meta-sturgeon-hybris \
+  ${SRCDIR}/meta-sawshark-hybris \
   ${SRCDIR}/meta-mtk6580-hybris \
   ${SRCDIR}/meta-mooneye-hybris \
   ${SRCDIR}/meta-swift-hybris \
