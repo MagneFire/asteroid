@@ -74,22 +74,10 @@ else
     clone_dir src/oe-core              https://github.com/openembedded/openembedded-core.git gatesgarth
     clone_dir src/oe-core/bitbake      https://github.com/openembedded/bitbake.git           1.48
     clone_dir src/meta-openembedded    https://github.com/openembedded/meta-openembedded.git gatesgarth
-    clone_dir src/meta-qt5             https://github.com/meta-qt5/meta-qt5                  master 8bc72a78b13f2f4c5e1cebebaef9e98b9abbb056
+    clone_dir src/meta-qt5             https://github.com/meta-qt5/meta-qt5                  gatesgarth
     clone_dir src/meta-smartphone      https://github.com/shr-distribution/meta-smartphone   gatesgarth
     clone_dir src/meta-asteroid        https://github.com/MagneFire/meta-asteroid            gatesgarth
-    clone_dir src/meta-anthias-hybris  https://github.com/AsteroidOS/meta-anthias-hybris     master
-    clone_dir src/meta-bass-hybris     https://github.com/AsteroidOS/meta-bass-hybris        master
-    clone_dir src/meta-dory-hybris     https://github.com/AsteroidOS/meta-dory-hybris        master
-    clone_dir src/meta-lenok-hybris    https://github.com/AsteroidOS/meta-lenok-hybris       master
-    clone_dir src/meta-mtk6580-hybris  https://github.com/AsteroidOS/meta-mtk6580-hybris     master
-    clone_dir src/meta-mooneye-hybris  https://github.com/AsteroidOS/meta-mooneye-hybris     master
-    clone_dir src/meta-sparrow-hybris  https://github.com/AsteroidOS/meta-sparrow-hybris     master
-    clone_dir src/meta-sprat-hybris    https://github.com/AsteroidOS/meta-sprat-hybris       master
     clone_dir src/meta-sturgeon-hybris https://github.com/MagneFire/meta-sturgeon-hybris     gatesgarth
-    clone_dir src/meta-smelt-hybris    https://github.com/AsteroidOS/meta-smelt-hybris       master
-    clone_dir src/meta-swift-hybris    https://github.com/AsteroidOS/meta-swift-hybris       master
-    clone_dir src/meta-tetra-hybris    https://github.com/AsteroidOS/meta-tetra-hybris       master
-    clone_dir src/meta-wren-hybris     https://github.com/AsteroidOS/meta-wren-hybris        master
 
     # Create local.conf and bblayers.conf on first run
     if [ ! -e build/conf/local.conf ]; then
@@ -114,19 +102,7 @@ BBLAYERS = " \
   ${SRCDIR}/meta-smartphone/meta-android \
   ${SRCDIR}/meta-openembedded/meta-python \
   ${SRCDIR}/meta-openembedded/meta-filesystems \
-  ${SRCDIR}/meta-anthias-hybris \
-  ${SRCDIR}/meta-sparrow-hybris \
-  ${SRCDIR}/meta-sprat-hybris \
-  ${SRCDIR}/meta-tetra-hybris \
-  ${SRCDIR}/meta-bass-hybris \
-  ${SRCDIR}/meta-dory-hybris \
-  ${SRCDIR}/meta-lenok-hybris \
   ${SRCDIR}/meta-sturgeon-hybris \
-  ${SRCDIR}/meta-smelt-hybris \
-  ${SRCDIR}/meta-mtk6580-hybris \
-  ${SRCDIR}/meta-mooneye-hybris \
-  ${SRCDIR}/meta-swift-hybris \
-  ${SRCDIR}/meta-wren-hybris \
   "' > build/conf/bblayers.conf
     fi
 
